@@ -1,10 +1,15 @@
 package com.otaku.ecommerce.dto;
 
 import java.time.LocalDateTime;
+import jakarta.validation.constraints.Pattern;
 
 public class ApiResponse<T> {
     private boolean success;
+    
+    @Pattern(regexp = "^[A-Z0-9_]+$", message = "Format internal code tidak valid")
     private String internalCode;
+    
+    @Pattern(regexp = "^[^<>{}]*$", message = "Format pesan tidak valid")
     private String message;
     private T data;
     private LocalDateTime timestamp;

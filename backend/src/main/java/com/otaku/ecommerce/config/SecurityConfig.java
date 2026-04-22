@@ -48,20 +48,19 @@ public class SecurityConfig {
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         // ─── Admin Only ───────────────────────────────────────
                         .requestMatchers("/api/v1/admin/**").hasRole("Admin")
-                        .requestMatchers(HttpMethod.POST,   "/api/v1/products").hasRole("Admin")
-                        .requestMatchers(HttpMethod.PUT,    "/api/v1/products/**").hasRole("Admin")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/products").hasRole("Admin")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/products/**").hasRole("Admin")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/products/**").hasRole("Admin")
-                        .requestMatchers(HttpMethod.PATCH,  "/api/v1/products/**").hasRole("Admin")
-                        .requestMatchers(HttpMethod.POST,   "/api/v1/discounts").hasRole("Admin")
-                        .requestMatchers(HttpMethod.PUT,    "/api/v1/discounts/**").hasRole("Admin")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/products/**").hasRole("Admin")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/discounts").hasRole("Admin")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/discounts/**").hasRole("Admin")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/discounts/**").hasRole("Admin")
                         // ─── Customer + Admin ─────────────────────────────────
                         .requestMatchers("/api/v1/orders/**").hasAnyRole("Customer", "Admin")
                         .requestMatchers("/api/v1/custom-orders/**").hasAnyRole("Customer", "Admin")
                         .requestMatchers("/api/v1/upload/**").hasAnyRole("Customer", "Admin")
                         // ─── Semua yang lain wajib auth ───────────────────────
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

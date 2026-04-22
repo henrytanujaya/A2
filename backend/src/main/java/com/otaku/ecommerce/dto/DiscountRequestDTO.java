@@ -10,15 +10,18 @@ import java.time.LocalDateTime;
 public class DiscountRequestDTO {
 
     @NotBlank(message = "Kode diskon tidak boleh kosong")
+    @Pattern(regexp = "^[A-Z0-9]{4,15}$", message = "Format kode diskon tidak valid")
     private String code;
 
     @NotBlank(message = "Tipe diskon tidak boleh kosong")
+    @Pattern(regexp = "^(Percentage|Fixed)$", message = "Tipe diskon tidak valid")
     private String discountType; // Percentage / Fixed
 
     @NotNull(message = "Nilai diskon tidak boleh kosong")
     @DecimalMin(value = "0.01", message = "Nilai diskon harus lebih dari 0")
     private BigDecimal discountValue;
 
+    @Pattern(regexp = "^(All|ActionFigure|CustomOutfit|Custom3D)$", message = "Kategori diskon tidak valid")
     private String applicableCategory; // All, ActionFigure, CustomOutfit, Custom3D
 
     private Integer maxUsage;      // null = unlimited

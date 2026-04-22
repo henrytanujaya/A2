@@ -1,6 +1,7 @@
 package com.otaku.ecommerce.dto;
 
 import java.math.BigDecimal;
+import jakarta.validation.constraints.Pattern;
 
 /**
  * DiscountResponseDTO — Menggantikan return entitas JPA Discount langsung ke response publik.
@@ -9,10 +10,17 @@ import java.math.BigDecimal;
  */
 public class DiscountResponseDTO {
 
+    @Pattern(regexp = "^[A-Z0-9]{4,15}$", message = "Format kode diskon tidak valid")
     private String code;
+    
+    @Pattern(regexp = "^(Percentage|Fixed)$", message = "Tipe diskon tidak valid")
     private String discountType;
+    
     private BigDecimal discountValue;
+    
+    @Pattern(regexp = "^(All|ActionFigure|CustomOutfit|Custom3D)$", message = "Kategori diskon tidak valid")
     private String applicableCategory;
+    
     private Boolean isActive;
 
     public String getCode() { return code; }

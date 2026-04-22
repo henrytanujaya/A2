@@ -2,6 +2,7 @@ package com.otaku.ecommerce.dto;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Pattern;
 import java.util.List;
 
 /**
@@ -16,6 +17,7 @@ public class OrderRequestDTO {
     @Valid
     private List<OrderItemRequestDTO> items;
 
+    @Pattern(regexp = "^[A-Z0-9]{4,15}$", message = "Format kode diskon tidak valid")
     private String discountCode;
 
     public List<OrderItemRequestDTO> getItems() { return items; }

@@ -75,12 +75,4 @@ cloudinary:
   outfit-folder: otaku-ecommerce/outfit-references
   figure-folder: otaku-ecommerce/figure-references
 
-# ─── Actuator ────────────────────────────────────────────────────────────────
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
-  endpoint:
-    health:
-      show-details: always
+

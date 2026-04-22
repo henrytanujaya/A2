@@ -10,11 +10,14 @@ import java.math.BigDecimal;
 public class ProductRequestDTO {
 
     @NotBlank(message = "Kategori tidak boleh kosong")
+    @Pattern(regexp = "^(ActionFigure|Outfit|Manga|BluRay)$", message = "Kategori tidak valid")
     private String category; // ActionFigure, Outfit, Manga, BluRay
 
     @NotBlank(message = "Nama produk tidak boleh kosong")
+    @Pattern(regexp = "^[a-zA-Z0-9\\s\\-_\\(\\)\\[\\]]+$", message = "Format nama produk tidak valid")
     private String name;
 
+    @Pattern(regexp = "^[a-zA-Z0-9\\s\\-_.,!?'\"()]*$", message = "Format deskripsi tidak valid")
     private String description;
 
     @NotNull(message = "Harga tidak boleh kosong")
@@ -25,6 +28,7 @@ public class ProductRequestDTO {
     @Min(value = 0, message = "Stok tidak boleh negatif")
     private Integer stockQuantity;
 
+    @Pattern(regexp = "^https?:\\/\\/.*\\.(?:png|jpg|jpeg|gif|webp)(?:\\?.*)?$", message = "Format URL gambar tidak valid")
     private String imageUrl;
 
     public String getCategory() { return category; }
