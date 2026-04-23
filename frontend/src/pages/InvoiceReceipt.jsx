@@ -27,6 +27,14 @@ export default function InvoiceReceipt() {
   const handlePayment = () => {
     showModal(`Pembayaran sebesar Rp ${invoice.summary.total.toLocaleString('id-ID')} menggunakan ${paymentMethod} berhasil diproses!`, 'success', () => {
       setInvoice(prev => ({ ...prev, status: 'LUNAS', paymentMethod }));
+      
+      // Update global orders
+      const savedOrders = JSON.parse(localStorage.getItem('kitsune_orders') || '[]');
+      const updatedOrders = savedOrders.map(o => 
+        o.invoiceId === invoice.invoiceId ? { ...o, status: 'LUNAS', paymentMethod } : o
+      );
+      localStorage.setItem('kitsune_orders', JSON.stringify(updatedOrders));
+
       clearCart();
     });
   };
@@ -122,6 +130,12 @@ export default function InvoiceReceipt() {
               <span>Subtotal Produk</span>
               <span>Rp {invoice.summary.subtotal.toLocaleString('id-ID')}</span>
             </div>
+            {invoice.summary.discount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '0.9rem', color: '#2ecc71' }}>
+                <span>Diskon</span>
+                <span>- Rp {invoice.summary.discount.toLocaleString('id-ID')}</span>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '0.9rem', color: '#555' }}>
               <span>Ongkos Kirim ({invoice.courier})</span>
               <span>Rp {invoice.summary.shipping.toLocaleString('id-ID')}</span>

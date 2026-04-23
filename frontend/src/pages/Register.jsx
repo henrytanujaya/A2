@@ -187,7 +187,7 @@ export default function Register() {
               <small style={{ color: '#dc143c', display: 'block', marginTop: '6px' }}>{errors.password}</small>
             ) : (
               <small style={{ display: 'block', color: '#888', marginTop: '6px', fontSize: '0.8rem' }}>
-                * Masukkan 8-16 karakter, dengan minimal 1 huruf besar, 1 huruf kecil, dan 1 simbol
+                * Masukkan minimal 8 karakter, dengan minimal 1 huruf besar, 1 huruf kecil, dan 1 simbol
               </small>
             )}
           </div>

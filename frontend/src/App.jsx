@@ -16,12 +16,14 @@ import Cart from './pages/Cart';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
+import UserOrders from './pages/UserOrders';
 import Checkout from './pages/Checkout';
 import InvoiceReceipt from './pages/InvoiceReceipt';
 
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminStock from './pages/admin/AdminStock';
+import AdminOrders from './pages/admin/AdminOrders';
 
 import { CartProvider } from './contexts/CartContext';
 import { ModalProvider } from './contexts/ModalContext';
@@ -50,6 +52,7 @@ function AppContent() {
           <Route path="/custom-3d" element={isLoggedIn ? <Custom3D /> : <Navigate to="/login" replace />} />
           <Route path="/cart" element={isLoggedIn ? <Cart /> : <Navigate to="/login" replace />} />
           <Route path="/profile" element={isLoggedIn ? <Profile /> : <Navigate to="/login" replace />} />
+          <Route path="/my-orders" element={isLoggedIn ? <UserOrders /> : <Navigate to="/login" replace />} />
           <Route path="/checkout" element={isLoggedIn ? <Checkout /> : <Navigate to="/login" replace />} />
           <Route path="/invoice" element={isLoggedIn ? <InvoiceReceipt /> : <Navigate to="/login" replace />} />
           <Route path="/login" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
@@ -58,6 +61,7 @@ function AppContent() {
           <Route path="/admin" element={isAdmin ? <AdminLayout setIsLoggedIn={setIsLoggedIn} /> : <Navigate to="/login" replace />}>
             <Route index element={<AdminDashboard />} />
             <Route path="stock" element={<AdminStock />} />
+            <Route path="orders" element={<AdminOrders />} />
           </Route>
         </Routes>
       </main>

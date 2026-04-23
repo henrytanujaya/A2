@@ -36,6 +36,9 @@ export default function Navbar({ isLoggedIn, setIsLoggedIn }) {
           </Link>
           {isLoggedIn ? (
             <div style={{ paddingLeft: '15px', borderLeft: '1px solid #333', display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <Link to="/my-orders" className={currentPath === '/my-orders' ? "nav-btn primary" : "nav-link"} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                Pesanan Saya
+              </Link>
               <Link to="/profile" className={currentPath === '/profile' ? "nav-btn primary" : "nav-link"} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <User size={18} /> Profil
               </Link>

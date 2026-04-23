@@ -16,11 +16,24 @@ export default function Checkout() {
     address: '',
     courier: 'JNE'
   });
+  const [voucher, setVoucher] = useState('');
+  const [discount, setDiscount] = useState(0);
 
   const total = cart.reduce((acc, item) => acc + item.price, 0);
   const ppn = total * 0.11;
   const shippingCost = 25000;
-  const grandTotal = total + ppn + shippingCost;
+  const grandTotal = total - discount + ppn + shippingCost;
+
+  const handleApplyVoucher = () => {
+    if (voucher.toUpperCase() === 'OTAKU10') {
+      const discAmount = total * 0.1;
+      setDiscount(discAmount);
+      showModal("Voucher berhasil digunakan! Diskon 10% diterapkan.", 'success');
+    } else {
+      setDiscount(0);
+      showModal("Kode voucher tidak valid.", 'error');
+    }
+  };
 
   useEffect(() => {
     // Tarik data user dari localStorage
@@ -63,6 +76,7 @@ export default function Checkout() {
       items: [...cart],
       summary: {
         subtotal: total,
+        discount: discount,
         ppn: ppn,
         shipping: shippingCost,
         total: grandTotal
@@ -71,6 +85,11 @@ export default function Checkout() {
       courier: formData.courier,
       status: 'UNPAID'
     };
+
+    // Save to global orders
+    const savedOrders = JSON.parse(localStorage.getItem('kitsune_orders') || '[]');
+    savedOrders.push(invoiceData);
+    localStorage.setItem('kitsune_orders', JSON.stringify(savedOrders));
 
     navigate('/invoice', { state: { invoiceData } });
   };
@@ -149,6 +168,12 @@ export default function Checkout() {
               <span>Subtotal Produk</span>
               <span>Rp {total.toLocaleString('id-ID')}</span>
             </div>
+            {discount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', color: '#2ecc71' }}>
+                <span>Diskon Voucher</span>
+                <span>- Rp {discount.toLocaleString('id-ID')}</span>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', color: 'var(--text-muted)' }}>
               <span>Ongkos Kirim</span>
               <span>Rp {shippingCost.toLocaleString('id-ID')}</span>
@@ -159,6 +184,14 @@ export default function Checkout() {
             </div>
             
             <hr style={{ borderColor: 'rgba(255,255,255,0.1)', marginBottom: '15px' }} />
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', color: '#a0a0b0', fontSize: '0.9rem' }}>Kode Voucher</label>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <input type="text" value={voucher} onChange={(e) => setVoucher(e.target.value)} placeholder="Contoh: OTAKU10" style={{ flex: 1, padding: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid #444', color: '#fff', borderRadius: '8px' }} />
+                <button type="button" onClick={handleApplyVoucher} style={{ padding: '10px 15px', background: 'rgba(255, 255, 255, 0.1)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Terapkan</button>
+              </div>
+            </div>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--accent-crimson)' }}>
               <span>Total Pembayaran</span>

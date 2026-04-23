@@ -68,6 +68,20 @@ export default function AdminLayout({ setIsLoggedIn }) {
             <Package size={20} />
             Kelola Stok
           </Link>
+          <Link 
+            to="/admin/orders" 
+            style={{
+              display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 15px',
+              borderRadius: '8px', textDecoration: 'none',
+              background: isActive('/admin/orders') ? 'rgba(220, 20, 60, 0.2)' : 'transparent',
+              color: isActive('/admin/orders') ? '#dc143c' : '#a0a0b0',
+              border: isActive('/admin/orders') ? '1px solid rgba(220, 20, 60, 0.5)' : '1px solid transparent',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            <Package size={20} />
+            Pesanan
+          </Link>
         </nav>
 
         <div style={{ padding: '0 15px' }}>
