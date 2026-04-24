@@ -1,13 +1,28 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ShoppingCart, User } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
+import axiosInstance from '../api/axiosInstance';
 
 export default function Navbar({ isLoggedIn, setIsLoggedIn }) {
   const cartContext = useCart();
   const cart = cartContext ? cartContext.cart : [];
   const location = useLocation();
+  const navigate = useNavigate();
   const currentPath = location.pathname;
+
+  const handleLogout = async () => {
+    try {
+      await axiosInstance.post('/api/v1/auth/logout');
+    } catch (err) {
+      console.warn('[LOGOUT] Backend logout gagal, tetap lanjut logout lokal:', err);
+    }
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userData');
+    setIsLoggedIn(false);
+    navigate('/login');
+  };
 
   return (
     <nav className="navbar">
@@ -43,7 +58,7 @@ export default function Navbar({ isLoggedIn, setIsLoggedIn }) {
                 <User size={18} /> Profil
               </Link>
               <button 
-                onClick={() => setIsLoggedIn(false)} 
+                onClick={handleLogout} 
                 className="nav-btn primary" 
                 style={{ cursor: 'pointer', fontFamily: 'inherit' }}
               >
@@ -61,3 +76,4 @@ export default function Navbar({ isLoggedIn, setIsLoggedIn }) {
     </nav>
   );
 }
+

@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Pattern;
 public class RegisterRequestDTO {
 
     @NotBlank(message = "Nama tidak boleh kosong")
-    @Pattern(regexp = "^[a-zA-Z\\s\\-']+$", message = "Format nama tidak valid")
+    @Pattern(regexp = "^[a-zA-Z0-9\\s\\-']+$", message = "Format nama tidak valid")
     private String name;
 
     @NotBlank(message = "Email tidak boleh kosong")

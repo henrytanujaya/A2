@@ -29,6 +29,12 @@ public class User {
     @Column(name = "CreatedAt")
     private LocalDateTime createdAt;
 
+    @Column(name = "Phone", length = 20)
+    private String phone;
+
+    @Column(name = "Address")
+    private String address;
+
     // Getters and Setters omitted for brevity but standard in practice.
     // In a real project we would use Lombok @Data or generate them.
 
@@ -44,4 +50,8 @@ public class User {
     public void setRole(String role) { this.role = role; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
 }

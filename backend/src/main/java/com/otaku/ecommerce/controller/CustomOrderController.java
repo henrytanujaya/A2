@@ -22,6 +22,7 @@ public class CustomOrderController {
 
     // ─── Create Custom Order (userId dari JWT, price NULL — Admin yang tetapkan) ─
     @PostMapping
+    @PreAuthorize("hasAnyRole('Customer', 'Admin')")
     public ResponseEntity<ApiResponse<CustomOrderResponseDTO>> createCustomOrder(
             @Valid @RequestBody CustomOrderRequestDTO request,
             Authentication authentication) {
@@ -34,6 +35,7 @@ public class CustomOrderController {
 
     // ─── Get My Custom Orders ─────────────────────────────────────────────────
     @GetMapping
+    @PreAuthorize("hasAnyRole('Customer', 'Admin')")
     public ResponseEntity<ApiResponse<List<CustomOrderResponseDTO>>> getMyCustomOrders(Authentication authentication) {
         List<CustomOrderResponseDTO> orders = customOrderService.getMyCustomOrders(authentication.getName());
         return ResponseEntity.ok(ApiResponse.success("OTK-2033", "Custom order berhasil diambil", orders));

@@ -2,20 +2,19 @@ package com.otaku.ecommerce.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import jakarta.validation.constraints.Pattern;
+import java.util.List;
 
 public class OrderResponseDTO {
     private Integer orderId;
     private BigDecimal totalAmount;
     private BigDecimal finalAmount;
-    
-    @Pattern(regexp = "^(PENDING|PAID|CANCELLED|SHIPPED|COMPLETED)$", message = "Status pesanan tidak valid")
     private String status;
-    
     private LocalDateTime createdAt;
-    
-    @Pattern(regexp = "^[A-Z0-9]{4,15}$", message = "Format kode diskon tidak valid")
+    private LocalDateTime updatedAt;
     private String discountCode;
+    private String shippingAddress;
+    private String courierName;
+    private List<OrderTrackingDTO> trackingHistory;
 
     public Integer getOrderId() { return orderId; }
     public void setOrderId(Integer orderId) { this.orderId = orderId; }
@@ -27,6 +26,14 @@ public class OrderResponseDTO {
     public void setStatus(String status) { this.status = status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     public String getDiscountCode() { return discountCode; }
     public void setDiscountCode(String discountCode) { this.discountCode = discountCode; }
+    public String getShippingAddress() { return shippingAddress; }
+    public void setShippingAddress(String shippingAddress) { this.shippingAddress = shippingAddress; }
+    public String getCourierName() { return courierName; }
+    public void setCourierName(String courierName) { this.courierName = courierName; }
+    public List<OrderTrackingDTO> getTrackingHistory() { return trackingHistory; }
+    public void setTrackingHistory(List<OrderTrackingDTO> trackingHistory) { this.trackingHistory = trackingHistory; }
 }

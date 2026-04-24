@@ -1,36 +1,77 @@
-import React, { useState } from 'react';
-import { User, Mail, MapPin, Phone, Package, Edit2, Check, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, Mail, MapPin, Phone, Package, Edit2, Check, X, Clock } from 'lucide-react';
+import axiosInstance from '../api/axiosInstance';
+import { useModal } from '../contexts/ModalContext';
 
 export default function Profile() {
+  const { showModal } = useModal();
   const [isEditing, setIsEditing] = useState(false);
-  const [profileData, setProfileData] = useState(() => {
-    const savedUser = localStorage.getItem('userData');
-    if (savedUser) {
-      const parsed = JSON.parse(savedUser);
-      return {
-        name: parsed.name || '',
-        email: parsed.email || '',
-        phone: parsed.phone || '',
-        address: parsed.address || ''
-      };
-    }
-    return { name: '', email: '', phone: '', address: '' };
-  });
+  const [profileData, setProfileData] = useState({ name: '', email: '', phone: '', address: '' });
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Dummy order history, initially empty
-  const [orders] = useState([]);
+  const fetchProfileAndOrders = async () => {
+    setLoading(true);
+    try {
+      const [profileRes, ordersRes] = await Promise.all([
+        axiosInstance.get('/api/v1/users/profile'),
+        axiosInstance.get('/api/v1/orders')
+      ]);
+
+      if (profileRes.data.success) {
+        setProfileData({
+          name: profileRes.data.data.name || '',
+          email: profileRes.data.data.email || '',
+          phone: profileRes.data.data.phone || '',
+          address: profileRes.data.data.address || ''
+        });
+      }
+
+      if (ordersRes.data.success) {
+        setOrders(ordersRes.data.data || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch profile/orders:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProfileAndOrders();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setProfileData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = () => {
-    const savedUser = JSON.parse(localStorage.getItem('userData') || '{}');
-    const updatedUser = { ...savedUser, ...profileData };
-    localStorage.setItem('userData', JSON.stringify(updatedUser));
-    setIsEditing(false);
+  const handleSave = async () => {
+    try {
+      const payload = {
+        name: profileData.name,
+        phone: profileData.phone,
+        address: profileData.address
+      };
+      
+      const response = await axiosInstance.put('/api/v1/users/profile', payload);
+      if (response.data.success) {
+        // update local storage just in case
+        const savedUser = JSON.parse(localStorage.getItem('userData') || '{}');
+        localStorage.setItem('userData', JSON.stringify({ ...savedUser, ...payload }));
+        
+        showModal('Profil berhasil diperbarui!', 'success');
+        setIsEditing(false);
+      }
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+      showModal('Gagal memperbarui profil.', 'error');
+    }
   };
+
+  if (loading) {
+    return <div className="container" style={{ paddingTop: '100px', minHeight: '80vh', textAlign: 'center' }}>Loading profile...</div>;
+  }
 
   return (
     <div className="container" style={{ paddingTop: '100px', paddingBottom: '50px', minHeight: '80vh', position: 'relative', zIndex: 10 }}>
@@ -88,7 +129,7 @@ export default function Profile() {
                 <Mail size={16} color="#ff2a5f" /> Email
               </label>
               {isEditing ? (
-                <input type="email" name="email" value={profileData.email} onChange={handleChange} placeholder="Masukkan email..." style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid #444', color: '#fff', borderRadius: '8px', fontSize: '1rem' }} />
+                <input type="email" name="email" value={profileData.email} disabled style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.1)', border: '1px solid #333', color: '#888', borderRadius: '8px', fontSize: '1rem', cursor: 'not-allowed' }} />
               ) : (
                 <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', color: profileData.email ? '#fff' : '#666', border: '1px solid transparent' }}>
                   {profileData.email || 'Belum diisi'}
@@ -127,7 +168,7 @@ export default function Profile() {
                 <button onClick={handleSave} className="nav-btn primary" style={{ flex: 1, padding: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
                   <Check size={18} /> Simpan Data
                 </button>
-                <button onClick={() => setIsEditing(false)} style={{ flex: 1, padding: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', background: 'transparent', border: '1px solid #555', color: '#ccc', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s ease' }} onMouseEnter={(e) => { e.currentTarget.style.background = '#222'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = '#777'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#ccc'; e.currentTarget.style.borderColor = '#555'; }}>
+                <button onClick={() => setIsEditing(false)} style={{ flex: 1, padding: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', background: 'transparent', border: '1px solid #555', color: '#ccc', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s ease' }}>
                   <X size={18} /> Batal
                 </button>
               </div>
@@ -150,8 +191,33 @@ export default function Profile() {
               <p style={{ color: '#666', fontSize: '0.9rem', lineHeight: '1.4' }}>Pakaian kustom eksklusif dan koleksi manga Anda akan tercatat di sini setelah melakukan pembayaran.</p>
             </div>
           ) : (
-            <div>
-              {/* Space for future orders mapped listing */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {orders.map((order, idx) => (
+                <div key={idx} style={{ background: 'rgba(0,0,0,0.2)', padding: '20px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <div style={{ fontWeight: 'bold' }}>Order #{order.orderId}</div>
+                    <div style={{ color: '#ff2a5f', fontWeight: 'bold' }}>Rp {order.finalAmount.toLocaleString('id-ID')}</div>
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: '#888', marginBottom: '15px' }}>{new Date(order.createdAt).toLocaleString('id-ID')}</div>
+                  
+                  {/* Status Timeline */}
+                  {order.trackingHistory && order.trackingHistory.length > 0 && (
+                    <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px dashed #444' }}>
+                      <h4 style={{ fontSize: '0.9rem', marginBottom: '10px', color: '#ccc' }}><Clock size={14} style={{ display: 'inline', marginRight: '5px' }}/> Status Tracking</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingLeft: '10px', borderLeft: '2px solid #ff2a5f' }}>
+                        {order.trackingHistory.map((track, tidx) => (
+                          <div key={tidx} style={{ position: 'relative', paddingLeft: '15px' }}>
+                            <div style={{ position: 'absolute', left: '-16px', top: '2px', width: '10px', height: '10px', borderRadius: '50%', background: '#ff2a5f' }}></div>
+                            <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#fff' }}>{track.status}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#888' }}>{new Date(track.createdAt).toLocaleString('id-ID')}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#aaa', marginTop: '3px' }}>{track.description}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>

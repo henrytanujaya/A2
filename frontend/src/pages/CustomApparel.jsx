@@ -5,6 +5,7 @@ import { useCart } from '../contexts/CartContext';
 import { removeBackground } from '@imgly/background-removal';
 import { Loader2 } from 'lucide-react';
 import { useModal } from '../contexts/ModalContext';
+import axiosInstance from '../api/axiosInstance';
 
 import bajuHitamDepan from '../assets/baju_hitam_depan.jpg';
 import bajuHitamBelakang from '../assets/baju_hitam_belakang.jpg';
@@ -37,8 +38,10 @@ export default function CustomApparel() {
   const { showModal } = useModal();
 
   // Image uploads base64 string
-  const [frontImage, setFrontImage] = useState(null);
-  const [backImage, setBackImage] = useState(null);
+  const [frontImage, setFrontImage] = useState(null); // URL pratinjau
+  const [frontBlob, setFrontBlob] = useState(null);   // File asli untuk upload
+  const [backImage, setBackImage] = useState(null);   // URL pratinjau
+  const [backBlob, setBackBlob] = useState(null);     // File asli untuk upload
   const [isProcessing, setIsProcessing] = useState(false);
 
   // RND state
@@ -60,9 +63,11 @@ export default function CustomApparel() {
         
         if (view === 'front') {
           setFrontImage(url);
+          setFrontBlob(imageBlob);
           setFrontRnd({ x: 50, y: 50, width: 150, height: 150 });
         } else {
           setBackImage(url);
+          setBackBlob(imageBlob);
           setBackRnd({ x: 50, y: 50, width: 150, height: 150 });
         }
       } catch (error) {
@@ -71,9 +76,11 @@ export default function CustomApparel() {
         const fallbackUrl = URL.createObjectURL(file);
         if (view === 'front') {
           setFrontImage(fallbackUrl);
+          setFrontBlob(file);
           setFrontRnd({ x: 50, y: 50, width: 150, height: 150 });
         } else {
           setBackImage(fallbackUrl);
+          setBackBlob(file);
           setBackRnd({ x: 50, y: 50, width: 150, height: 150 });
         }
       } finally {
@@ -97,13 +104,60 @@ export default function CustomApparel() {
 
   const { addToCart } = useCart();
 
-  const handleAddToCart = () => {
-    addToCart({
-      name: `Custom ${apparel === 'tshirt' ? 'T-Shirt' : 'Jacket'}`,
-      price: calculateTotal(),
-      image: frontImage || backImage || MOCKUPS[apparel][color]['front'],
-      details: `Warna: ${color}\nUkuran: ${size}\nCetak Depan: ${frontImage ? 'Ya' : 'Tidak'}\nCetak Belakang: ${backImage ? 'Ya' : 'Tidak'}`
-    });
+  const handleAddToCart = async () => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      showModal("Silakan login terlebih dahulu untuk melakukan custom order", "error");
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      let uploadedImageUrl = null;
+      const targetBlob = frontBlob || backBlob;
+
+      // 1. Upload ke Cloudinary jika ada gambar
+      if (targetBlob) {
+        const formData = new FormData();
+        formData.append('file', targetBlob);
+        const uploadRes = await axiosInstance.post('/api/v1/upload/outfit-reference', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        uploadedImageUrl = uploadRes.data.data.imageUrl;
+      }
+
+      // 2. Simpan sebagai Custom Order di Database
+      const customOrderReq = {
+        serviceType: `Apparel: ${apparel}`,
+        imageReferenceUrl: uploadedImageUrl,
+        price: calculateTotal(),
+        configurationJson: JSON.stringify({
+          apparel, color, size,
+          frontRnd, backRnd,
+          hasFrontPrint: !!frontBlob,
+          hasBackPrint: !!backBlob
+        })
+      };
+
+      const customOrderRes = await axiosInstance.post('/api/v1/custom-orders', customOrderReq);
+      const customOrderId = customOrderRes.data.data.id;
+
+      // 3. Masukkan ke Keranjang
+      await addToCart({
+        customOrderId: customOrderId,
+        name: `Custom ${apparel === 'tshirt' ? 'T-Shirt' : 'Jacket'}`,
+        price: calculateTotal(),
+        image: uploadedImageUrl || MOCKUPS[apparel][color]['front'],
+        details: `Warna: ${color}\nUkuran: ${size}\nCetak Depan: ${frontImage ? 'Ya' : 'Tidak'}\nCetak Belakang: ${backImage ? 'Ya' : 'Tidak'}`,
+        quantity: 1
+      });
+
+    } catch (error) {
+      console.error("Gagal memproses custom order:", error);
+      showModal("Gagal menyimpan desain. Silakan coba lagi.", "error");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (

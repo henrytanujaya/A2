@@ -32,22 +32,26 @@ public class CustomOrderService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new CustomBusinessException("OTK-4041", "User tidak ditemukan", 404));
 
-        if (!List.of("AF_3D", "Outfit").contains(request.getServiceType())) {
-            throw new CustomBusinessException("OTK-4010",
-                "ServiceType tidak valid. Gunakan 'AF_3D' atau 'Outfit'.", 400);
-        }
-
         CustomOrder customOrder = new CustomOrder();
         customOrder.setUser(user);
         customOrder.setServiceType(request.getServiceType());
         customOrder.setImageReferenceUrl(request.getImageReferenceUrl());
         customOrder.setConfigurationJson(request.getConfigurationJson());
-        customOrder.setStatus("Pending Review");
-        customOrder.setPrice(null);
+        
+        // Otomatis jadi Quoted jika harga dikirim (agar bisa langsung dibayar)
+        if (request.getPrice() != null) {
+            customOrder.setPrice(request.getPrice());
+            customOrder.setStatus("Quoted");
+        } else {
+            customOrder.setPrice(null);
+            customOrder.setStatus("Pending Review");
+        }
+        
         customOrder.setCreatedAt(LocalDateTime.now());
 
         CustomOrder saved = customOrderRepository.save(customOrder);
-        log.info("[CUSTOM-ORDER] Custom order {} dibuat oleh userId={}", saved.getId(), user.getId());
+        log.info("[CUSTOM-ORDER] Custom order {} dibuat dengan status {} oleh userId={}", 
+                 saved.getId(), saved.getStatus(), user.getId());
         return toDTO(saved);
     }
 

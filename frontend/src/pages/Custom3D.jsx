@@ -2,6 +2,8 @@ import React, { useState, Suspense } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, X, Check, Box as BoxIcon, Loader2, Scissors } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
+import { useModal } from '../contexts/ModalContext';
+import axiosInstance from '../api/axiosInstance';
 import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls, Environment, ContactShadows, Html, Center, Float } from '@react-three/drei';
 import * as THREE from 'three';
@@ -54,17 +56,63 @@ function Loader() {
 }
 
 export default function Custom3D() {
-  const [fileUrl, setFileUrl] = useState(null);
+  const [fileUrl, setFileUrl] = useState(null); // Preview
+  const [fileBlob, setFileBlob] = useState(null); // Actual file for upload
   const [isProcessing, setIsProcessing] = useState(false);
   const { addToCart } = useCart();
+  const { showModal } = useModal();
 
-  const handleAddToCart = () => {
-    addToCart({
-      name: "Custom 3D Action Figure (AI Generated)",
-      price: 350000,
-      image: fileUrl || null,
-      details: "Tipe: True 3D Custom Figure\nModel: Akrilik Cutout Standee\nFitur: Auto Background Removal"
-    });
+  const handleAddToCart = async () => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      showModal("Silakan login terlebih dahulu untuk melakukan custom order", "error");
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      let uploadedImageUrl = null;
+
+      // 1. Upload ke Cloudinary
+      if (fileBlob) {
+        const formData = new FormData();
+        formData.append('file', fileBlob);
+        const uploadRes = await axiosInstance.post('/api/v1/upload/figure-reference', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        uploadedImageUrl = uploadRes.data.data.imageUrl;
+      }
+
+      // 2. Simpan sebagai Custom Order
+      const customOrderReq = {
+        serviceType: "3D Figure",
+        imageReferenceUrl: uploadedImageUrl,
+        price: 350000,
+        configurationJson: JSON.stringify({
+          type: "AI Generated 3D Standee",
+          originalFileName: fileBlob?.name
+        })
+      };
+
+      const customOrderRes = await axiosInstance.post('/api/v1/custom-orders', customOrderReq);
+      const customOrderId = customOrderRes.data.data.id;
+
+      // 3. Tambah ke Keranjang
+      await addToCart({
+        customOrderId: customOrderId,
+        name: "Custom 3D Action Figure (AI Generated)",
+        price: 350000,
+        image: uploadedImageUrl,
+        details: "Tipe: True 3D Custom Figure\nModel: Akrilik Cutout Standee\nFitur: Auto Background Removal",
+        quantity: 1
+      });
+
+    } catch (error) {
+      console.error("Gagal memproses custom order figure:", error);
+      showModal("Gagal menyimpan desain 3D. Silakan coba lagi.", "error");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const onDrop = React.useCallback(async acceptedFiles => {
@@ -77,10 +125,12 @@ export default function Custom3D() {
         const imageBlob = await removeBackground(file);
         const url = URL.createObjectURL(imageBlob);
         setFileUrl(url);
+        setFileBlob(imageBlob);
       } catch (error) {
         console.error("Gagal menghapus background:", error);
         // Fallback or warning can be added here
         setFileUrl(URL.createObjectURL(file));
+        setFileBlob(file);
       } finally {
         setIsProcessing(false);
       }

@@ -25,27 +25,29 @@ public class TokenBlacklistService {
     private RedisTemplate<String, String> redisTemplate;
 
     /**
-     * Tambahkan access token ke blacklist Redis dengan TTL sesuai sisa umur token.
+     * Tambahkan jti (JWT ID) ke blacklist Redis dengan TTL sesuai sisa umur token.
      */
-    public void blacklistToken(String token, long ttlMillis) {
+    public void blacklistJti(String jti, long ttlMillis) {
+        if (jti == null || ttlMillis <= 0) return;
         try {
-            String key = BLACKLIST_PREFIX + token;
-            redisTemplate.opsForValue().set(key, "revoked", ttlMillis, TimeUnit.MILLISECONDS);
-            log.info("[BLACKLIST] Access token di-blacklist, TTL={}ms", ttlMillis);
+            String key = BLACKLIST_PREFIX + jti;
+            redisTemplate.opsForValue().set(key, "1", ttlMillis, TimeUnit.MILLISECONDS);
+            log.info("[BLACKLIST] JTI {} di-blacklist, TTL={}ms", jti, ttlMillis);
         } catch (Exception e) {
-            log.error("[BLACKLIST-ERROR] Gagal blacklist token: {}", e.getMessage());
+            log.error("[BLACKLIST-ERROR] Gagal blacklist JTI: {}", e.getMessage());
         }
     }
 
     /**
-     * Cek apakah token ada di blacklist.
+     * Cek apakah JTI ada di blacklist.
      */
-    public boolean isBlacklisted(String token) {
+    public boolean isJtiBlacklisted(String jti) {
+        if (jti == null) return false;
         try {
-            return Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_PREFIX + token));
+            return Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_PREFIX + jti));
         } catch (Exception e) {
-            log.error("[BLACKLIST-ERROR] Gagal cek blacklist: {}", e.getMessage());
-            return false; // fail-open agar tidak blokir semua request saat Redis down
+            log.error("[BLACKLIST-ERROR] Gagal cek blacklist JTI: {}", e.getMessage());
+            return false;
         }
     }
 
@@ -53,6 +55,7 @@ public class TokenBlacklistService {
      * Force logout user — tandai userId di Redis agar semua token lama ditolak.
      * TTL: 24 jam (sama dengan max umur access token yang mungkin masih aktif).
      */
+    @SuppressWarnings("null")
     public void forceLogoutUser(Integer userId) {
         if (userId == null)
             return;

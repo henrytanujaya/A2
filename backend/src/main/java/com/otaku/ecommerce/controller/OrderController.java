@@ -22,6 +22,7 @@ public class OrderController {
 
     // ─── Create Order (userId dari JWT, BUKAN dari body — IDOR fix) ──────────
     @PostMapping
+    @PreAuthorize("hasAnyRole('Customer', 'Admin')")
     public ResponseEntity<ApiResponse<OrderResponseDTO>> createOrder(
             @Valid @RequestBody OrderRequestDTO request,
             Authentication authentication) {
@@ -34,6 +35,7 @@ public class OrderController {
 
     // ─── Get My Orders ────────────────────────────────────────────────────────
     @GetMapping
+    @PreAuthorize("hasAnyRole('Customer', 'Admin')")
     public ResponseEntity<ApiResponse<List<OrderResponseDTO>>> getMyOrders(Authentication authentication) {
         List<OrderResponseDTO> orders = orderService.getOrdersByUser(authentication.getName());
         return ResponseEntity.ok(ApiResponse.success("OTK-2021", "Riwayat order berhasil diambil", orders));

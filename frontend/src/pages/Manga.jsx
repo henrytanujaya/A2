@@ -1,20 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useCart } from '../contexts/CartContext';
 import { Search } from 'lucide-react';
-
-const mangaDatabases = [
-  { id: 101, title: "Berserk - Deluxe Edition Vol 1", price: 450000, genre: "Dark Fantasy", image: "https://images.unsplash.com/photo-1544640808-32cb4fbad06e?q=80&w=600&auto=format&fit=crop", rating: 5, dateAdded: '2023-11-20' },
-  { id: 102, title: "Attack on Titan Vol 34", price: 120000, genre: "Dark Fantasy", image: "https://images.unsplash.com/photo-1618331835717-801e976710b2?q=80&w=600&auto=format&fit=crop", rating: 5, dateAdded: '2023-12-01' },
-  { id: 103, title: "Solo Leveling Vol 1", price: 180000, genre: "Action", image: "https://images.unsplash.com/photo-1541961017774-22349e4a1262?q=80&w=600&auto=format&fit=crop", rating: 4, dateAdded: '2023-10-15' },
-  { id: 104, title: "Tokyo Ghoul Vol 1", price: 150000, genre: "Dark Fantasy", image: "https://images.unsplash.com/photo-1518382473859-fb01dd797960?q=80&w=600&auto=format&fit=crop", rating: 5, dateAdded: '2023-11-10' },
-  { id: 105, title: "Mushoku Tensei Vol 1", price: 130000, genre: "Isekai", image: "https://images.unsplash.com/photo-1589998059171-989d887dda1e?q=80&w=600&auto=format&fit=crop", rating: 4, dateAdded: '2023-09-25' },
-  { id: 106, title: "Chainsaw Man Vol 1", price: 140000, genre: "Action", image: "https://images.unsplash.com/photo-1601645063073-67c6eb230ed8?q=80&w=600&auto=format&fit=crop", rating: 5, dateAdded: '2024-01-05' },
-  { id: 107, title: "Re:Zero Vol 1", price: 160000, genre: "Isekai", image: "https://images.unsplash.com/photo-1614983646436-b51f04af2553?q=80&w=600&auto=format&fit=crop", rating: 5, dateAdded: '2024-02-10' },
-  { id: 108, title: "Jujutsu Kaisen Vol 1", price: 150000, genre: "Action", image: "https://images.unsplash.com/photo-1491841550275-ad7854e35ca6?q=80&w=600&auto=format&fit=crop", rating: 5, dateAdded: '2024-03-15' },
-  { id: 109, title: "Vagabond Vol 1", price: 145000, genre: "Action", image: "https://images.unsplash.com/photo-1601645063073-67c6eb230ed8?q=80&w=600&auto=format&fit=crop", rating: 5, dateAdded: '2023-08-05' },
-  { id: 110, title: "Overlord Vol 1", price: 95000, genre: "Isekai", image: "https://images.unsplash.com/photo-1589998059171-989d887dda1e?q=80&w=600&auto=format&fit=crop", rating: 4, dateAdded: '2023-07-20' },
-];
+import axiosInstance from '../api/axiosInstance';
 
 const priceOptions = [
   { label: "Semua Harga", value: Infinity },
@@ -28,36 +16,70 @@ const priceOptions = [
 
 export default function Manga() {
   const { addToCart } = useCart();
+  const [mangaDatabases, setMangaDatabases] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   const [activeGenre, setActiveGenre] = useState('All');
   const [maxPrice, setMaxPrice] = useState(Infinity);
   const [searchQuery, setSearchQuery] = useState('');
 
   const genres = ['All', 'Dark Fantasy', 'Isekai', 'Action'];
 
+  useEffect(() => {
+    const fetchManga = async () => {
+      try {
+        const response = await axiosInstance.get('/api/v1/products');
+        if (response.data.success) {
+          const allProducts = response.data.data;
+          const mangas = allProducts.filter(p => p.category === 'Manga');
+          setMangaDatabases(mangas);
+        }
+      } catch (err) {
+        console.error('Failed to fetch manga products', err);
+        setError('Gagal memuat data manga. Pastikan server backend aktif.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchManga();
+  }, []);
+
   // Sorting newest first and applying filters
   const { newArrivals, topManga } = useMemo(() => {
     let baseFiltered = mangaDatabases;
     
     if (searchQuery.trim() !== '') {
-      baseFiltered = baseFiltered.filter(m => m.title.toLowerCase().includes(searchQuery.toLowerCase()));
+      baseFiltered = baseFiltered.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
 
     if (activeGenre !== 'All') {
-      baseFiltered = baseFiltered.filter(m => m.genre === activeGenre);
+      baseFiltered = baseFiltered.filter(m => m.description?.includes(activeGenre));
     }
     
     baseFiltered = baseFiltered.filter(m => m.price < maxPrice);
 
     // Derive New Arrivals (Sort by newest date)
-    const newArrivalsList = [...baseFiltered].sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded)).slice(0, 4);
+    const newArrivalsList = [...baseFiltered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 4);
     
     // Derive Top Manga (Sort by highest rating, can fallback to ID if tying)
-    const topMangaList = [...baseFiltered].sort((a, b) => b.rating - a.rating || b.price - a.price).slice(0, 8);
+    const topMangaList = [...baseFiltered].sort((a, b) => (b.rating || 0) - (a.rating || 0) || b.price - a.price).slice(0, 8);
 
     return { newArrivals: newArrivalsList, topManga: topMangaList };
-  }, [activeGenre, maxPrice, searchQuery]);
+  }, [mangaDatabases, activeGenre, maxPrice, searchQuery]);
 
   const renderProductGrid = (mangas) => {
+    if (loading) {
+      return <div style={{ color: 'var(--text-muted)' }}>Loading...</div>;
+    }
+    if (error) {
+      return (
+        <div style={{ textAlign: 'center', padding: '40px 20px', background: 'rgba(220,20,60,0.1)', borderRadius: '12px', border: '1px dashed rgba(220,20,60,0.3)' }}>
+          <p style={{ color: '#dc143c', marginBottom: '10px', fontWeight: 'bold' }}>⚠️ Koneksi Gagal</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{error}</p>
+        </div>
+      );
+    }
     if (mangas.length === 0) {
       return (
         <div style={{ textAlign: 'left', padding: '20px 0', width: '100%' }}>
@@ -76,27 +98,29 @@ export default function Manga() {
             transition={{ duration: 0.3, delay: index * 0.05 }}
           >
             <div style={{ overflow: 'hidden' }}>
-              <img src={product.image} alt={product.title} className="product-image" />
+              <img src={product.imageUrl} alt={product.name} className="product-image" />
             </div>
             <div className="product-info">
               <span style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                {product.genre}
+                {product.category}
               </span>
-              <h3 className="product-title" style={{ fontSize: '16px', marginTop: '4px' }}>{product.title}</h3>
+              <h3 className="product-title" style={{ fontSize: '16px', marginTop: '4px' }}>{product.name}</h3>
               <p className="product-price">Rp {product.price.toLocaleString('id-ID')}</p>
               
               <div style={{ display: 'flex', gap: '2px', marginBottom: '15px', color: '#f59e0b' }}>
-                {[...Array(product.rating)].map((_, i) => (
+                {[...Array(product.rating || 5)].map((_, i) => (
                   <span key={i}>★</span>
                 ))}
               </div>
 
               <button 
                 onClick={() => addToCart({
-                  name: product.title,
+                  productId: product.id,
+                  name: product.name,
                   price: product.price,
-                  image: product.image,
-                  details: `Kategori: Manga\nGenre: ${product.genre}`
+                  imageUrl: product.imageUrl,
+                  details: `Kategori: ${product.category}`,
+                  quantity: 1
                 })}
                 className="add-to-cart-btn" 
                 style={{ marginTop: 'auto' }}

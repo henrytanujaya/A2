@@ -18,8 +18,8 @@ export default function Register() {
   const [errors, setErrors] = useState({});
 
   const validatePassword = (pass) => {
-    // 8-16 karakter, minimal 1 huruf besar
-    const regex = /^(?=.*[A-Z]).{8,16}$/;
+    // Minimal 8 karakter, 1 Besar, 1 Kecil, 1 Angka, 1 Simbol
+    const regex = /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=!_]).{8,}$/;
     return regex.test(pass);
   };
 
@@ -36,7 +36,7 @@ export default function Register() {
     if (!password) {
       newErrors.password = "Password tidak boleh kosong";
     } else if (!validatePassword(password)) {
-      newErrors.password = "Password harus 8-16 karakter dan mengandung minimal 1 huruf besar";
+      newErrors.password = "Password minimal 8 karakter, mengandung huruf besar, kecil, angka, dan simbol (@#$%^&+=!_)";
     }
 
     if (!confirmPassword) {
@@ -65,8 +65,21 @@ export default function Register() {
       }
     } catch (error) {
       console.error("Register Error:", error);
-      const message = error.response?.data?.message || "Registrasi gagal. Email mungkin sudah terdaftar.";
-      setErrors({ email: message });
+      const responseData = error.response?.data;
+      
+      if (responseData?.message) {
+        // Jika ada pesan spesifik dari backend (seperti "Format nama tidak valid")
+        const msg = responseData.message;
+        if (msg.toLowerCase().includes('nama')) {
+          setErrors({ username: msg });
+        } else if (msg.toLowerCase().includes('password')) {
+          setErrors({ password: msg });
+        } else {
+          setErrors({ email: msg });
+        }
+      } else {
+        setErrors({ email: "Registrasi gagal. Silakan coba lagi." });
+      }
     }
   };
 

@@ -13,15 +13,15 @@ public class CustomOrderRequestDTO {
     // userId DIHAPUS — diambil dari JWT token
     // price DIHAPUS — ditetapkan Admin setelah review
 
-    @NotBlank(message = "ServiceType tidak boleh kosong")
-    @Pattern(regexp = "^(AF_3D|Outfit)$", message = "Tipe layanan tidak valid")
+    @NotBlank(message = "Service type tidak boleh kosong")
     private String serviceType; // AF_3D / Outfit
 
-    @Pattern(regexp = "^https?:\\/\\/res\\.cloudinary\\.com\\/.*(?:\\.(?:png|jpg|jpeg|webp))?$", message = "URL gambar referensi harus dari Cloudinary")
-    private String imageReferenceUrl; // URL dari hasil upload Cloudinary
+    private String imageReferenceUrl; 
 
-    @Pattern(regexp = "^\\{(?s:.)*\\}$", message = "Format konfigurasi harus berupa JSON object yang valid")
+    @NotBlank(message = "Konfigurasi tidak boleh kosong")
     private String configurationJson; // Konfigurasi detail
+
+    private java.math.BigDecimal price;
 
     public String getServiceType() { return serviceType; }
     public void setServiceType(String serviceType) { this.serviceType = serviceType; }
@@ -29,4 +29,6 @@ public class CustomOrderRequestDTO {
     public void setImageReferenceUrl(String imageReferenceUrl) { this.imageReferenceUrl = imageReferenceUrl; }
     public String getConfigurationJson() { return configurationJson; }
     public void setConfigurationJson(String configurationJson) { this.configurationJson = configurationJson; }
+    public java.math.BigDecimal getPrice() { return price; }
+    public void setPrice(java.math.BigDecimal price) { this.price = price; }
 }

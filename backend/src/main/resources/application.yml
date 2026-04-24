@@ -43,8 +43,14 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     baseline-version: 0
-    out-of-order: false
-    validate-on-migrate: true
+    out-of-order: true
+    validate-on-migrate: false
+
+  # ─── Session Management (Redis) ────────────────────────────────────────────
+  session:
+    store-type: redis
+    redis:
+      namespace: spring:session
 
   # ─── Redis — Token Blacklist ────────────────────────────────────────────────
   data:
@@ -67,12 +73,10 @@ jwt:
   access-token-expiration: 900000      # 15 menit
   refresh-token-expiration: 604800000  # 7 hari
 
-# ─── Cloudinary ──────────────────────────────────────────────────────────────
-cloudinary:
-  cloud-name: ${CLOUDINARY_CLOUD_NAME:dvyuk3imn}
-  api-key: ${CLOUDINARY_API_KEY:221798975154623}
-  api-secret: ${CLOUDINARY_API_SECRET:xviTxyjLUXElj4YfyT55Pj-Sf1k}
-  outfit-folder: otaku-ecommerce/outfit-references
-  figure-folder: otaku-ecommerce/figure-references
+# ─── File Storage (Local) ──────────────────────────────────────────────────
+storage:
+  upload-dir: uploads
+  outfit-dir: ${storage.upload-dir}/outfits
+  figure-dir: ${storage.upload-dir}/figures
 
 

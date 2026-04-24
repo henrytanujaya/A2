@@ -2,6 +2,7 @@ package com.otaku.ecommerce.entity;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "Products")
@@ -30,6 +31,15 @@ public class Product {
     @Column(name = "ImageURL")
     private String imageUrl;
 
+    @Column(name = "CreatedAt")
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "Rating")
+    private Integer rating = 0;
+
+    @Column(name = "Weight")
+    private Integer weight = 500; // gram
+
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
     public String getCategory() { return category; }
@@ -44,4 +54,11 @@ public class Product {
     public void setStockQuantity(Integer stockQuantity) { this.stockQuantity = stockQuantity; }
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public Integer getRating() { return rating; }
+    public void setRating(Integer rating) { this.rating = rating; }
+    public Integer getWeight() { return weight; }
+    public void setWeight(Integer weight) { this.weight = weight; }
 }
+

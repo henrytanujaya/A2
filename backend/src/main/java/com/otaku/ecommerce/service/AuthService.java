@@ -62,7 +62,7 @@ public class AuthService {
         }
 
         // Buat Access Token (15 menit) & Refresh Token (7 hari)
-        String accessToken  = jwtUtil.generateAccessToken(user.getEmail(), user.getRole());
+        String accessToken  = jwtUtil.generateAccessToken(user.getId(), user.getEmail(), user.getRole());
         String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
 
         // Simpan refresh token ke DB (revoke semua yang lama terlebih dahulu)
@@ -120,7 +120,7 @@ public class AuthService {
         // Rotation: revoke semua token lama user, buat baru
         refreshTokenRepository.revokeAllByUserId(user.getId());
 
-        String newAccessToken  = jwtUtil.generateAccessToken(user.getEmail(), user.getRole());
+        String newAccessToken  = jwtUtil.generateAccessToken(user.getId(), user.getEmail(), user.getRole());
         String newRefreshToken = jwtUtil.generateRefreshToken(user.getEmail());
         saveRefreshToken(user, newRefreshToken);
 
@@ -137,14 +137,18 @@ public class AuthService {
     // ─── Logout ───────────────────────────────────────────────────────────────
     @Transactional
     public void logout(String accessToken, Integer userId) {
-        // Blacklist access token di Redis (TTL = sisa umur token)
-        long ttl = jwtUtil.getAccessTokenExpiration();
-        tokenBlacklistService.blacklistToken(accessToken, ttl);
+        // Extract JTI and Expiration
+        String jti = jwtUtil.extractJti(accessToken);
+        java.util.Date expiry = jwtUtil.extractExpiration(accessToken);
+        long ttl = expiry.getTime() - System.currentTimeMillis();
+
+        // Blacklist JTI di Redis (TTL = sisa umur token)
+        tokenBlacklistService.blacklistJti(jti, ttl);
 
         // Revoke semua refresh token user di database
         refreshTokenRepository.revokeAllByUserId(userId);
 
-        log.info("[LOGOUT] userId={} berhasil logout", userId);
+        log.info("[LOGOUT] userId={} berhasil logout, JTI={} di-blacklist", userId, jti);
     }
 
     // ─── Force Logout (Admin action) ─────────────────────────────────────────
@@ -174,6 +178,8 @@ public class AuthService {
         dto.setEmail(user.getEmail());
         dto.setRole(user.getRole());
         dto.setCreatedAt(user.getCreatedAt());
+        dto.setPhone(user.getPhone());
+        dto.setAddress(user.getAddress());
         return dto;
     }
 

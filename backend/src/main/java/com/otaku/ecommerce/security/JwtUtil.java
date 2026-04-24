@@ -34,9 +34,11 @@ public class JwtUtil {
     }
 
     // ─── Access Token (15 menit) ──────────────────────────────────────────────
-    public String generateAccessToken(String email, String role) {
+    public String generateAccessToken(Integer userId, String email, String role) {
         return Jwts.builder()
                 .subject(email)
+                .id(java.util.UUID.randomUUID().toString()) // jti
+                .claim("userId", userId)
                 .claim("role", role)
                 .claim("type", "access")
                 .issuedAt(new Date())
@@ -69,6 +71,14 @@ public class JwtUtil {
     // ─── Ekstrak Data ─────────────────────────────────────────────────────────
     public String extractEmail(String token) {
         return extractClaim(token, Claims::getSubject);
+    }
+
+    public String extractJti(String token) {
+        return extractClaim(token, Claims::getId);
+    }
+
+    public Integer extractUserId(String token) {
+        return (Integer) extractAllClaims(token).get("userId");
     }
 
     public String extractRole(String token) {

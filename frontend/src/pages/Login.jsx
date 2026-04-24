@@ -23,18 +23,6 @@ export default function Login({ setIsLoggedIn }) {
       return;
     }
 
-    // Hardcode Admin Bypass
-    if (email === 'admin' && password === 'password') {
-      const adminUser = { id: 0, name: 'Super Admin', email: 'admin@system', role: 'Admin' };
-      localStorage.setItem('userData', JSON.stringify(adminUser));
-      showModal("Login Admin Berhasil! Selamat datang di Panel Admin.", 'success', () => {
-        setErrors({});
-        setIsLoggedIn(true);
-        navigate('/admin');
-      });
-      return;
-    }
-
     try {
       const response = await axiosInstance.post('/api/v1/auth/login', {
         email,
@@ -43,16 +31,49 @@ export default function Login({ setIsLoggedIn }) {
 
       if (response.data.success) {
         const { accessToken, refreshToken, user } = response.data.data;
-        
+
         // Simpan token untuk integrasi API selanjutnya
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('refreshToken', refreshToken);
         localStorage.setItem('userData', JSON.stringify(user));
-        
-        showModal("Login Berhasil! Selamat datang kembali.", 'success', () => {
+
+        const isAdmin = user?.role === 'Admin';
+        const destination = isAdmin ? '/admin' : '/';
+        const welcomeMsg = isAdmin
+          ? "Login Admin Berhasil! Selamat datang di Panel Admin."
+          : "Login Berhasil! Selamat datang kembali.";
+
+        // Sync Guest Cart to User Cart
+        try {
+            const guestId = localStorage.getItem('guest_id');
+            if (guestId) {
+                const guestCartRes = await axiosInstance.get('/api/v1/cart/guest', {
+                    headers: { 'X-Guest-ID': guestId }
+                });
+                const guestItems = guestCartRes.data?.data || [];
+                if (guestItems.length > 0) {
+                    const syncData = guestItems.map(item => ({
+                        productId: item.productId,
+                        customOrderId: item.customOrderId,
+                        quantity: item.quantity
+                    }));
+                    await axiosInstance.post('/api/v1/cart/sync', { items: syncData }, {
+                        headers: { Authorization: `Bearer ${accessToken}` }
+                    });
+                    // Clear guest cart after sync
+                    await axiosInstance.delete('/api/v1/cart/guest', {
+                        headers: { 'X-Guest-ID': guestId }
+                    });
+                }
+            }
+        } catch (syncError) {
+            console.error('Failed to sync cart:', syncError);
+        }
+
+        showModal(welcomeMsg, 'success', () => {
           setErrors({});
           setIsLoggedIn(true);
-          navigate('/');
+          navigate(destination);
         });
       }
     } catch (error) {
@@ -64,7 +85,7 @@ export default function Login({ setIsLoggedIn }) {
 
   return (
     <section className="container" style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <motion.div 
+      <motion.div
         className="form-container"
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -87,15 +108,15 @@ export default function Login({ setIsLoggedIn }) {
           <span className="brand-font" style={{ fontSize: '1.8rem', textAlign: 'center', color: '#fff' }}>KITSUNE NOIR</span>
         </div>
         <h2 style={{ textAlign: 'center', marginBottom: '30px', fontSize: '1.2rem', color: '#dc143c', fontWeight: '500' }}>Login to your account</h2>
-        
+
         <form style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
             <label style={{ display: 'block', marginBottom: '8px', color: '#a0a0b0' }}>Email</label>
-            <input 
-              type="email" 
+            <input
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Masukkan email Anda" 
+              placeholder="Masukkan email Anda"
               style={{
                 width: '100%',
                 padding: '12px 15px',
@@ -109,15 +130,15 @@ export default function Login({ setIsLoggedIn }) {
             />
             {errors.email && <small style={{ color: '#dc143c', marginTop: '5px', display: 'block' }}>{errors.email}</small>}
           </div>
-          
+
           <div>
             <div style={{ position: 'relative' }}>
               <label style={{ display: 'block', marginBottom: '8px', color: '#a0a0b0' }}>Password</label>
-              <input 
-                type={showPassword ? "text" : "password"} 
+              <input
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Masukkan Password Anda" 
+                placeholder="Masukkan Password Anda"
                 style={{
                   width: '100%',
                   padding: '12px 40px 12px 15px',
@@ -151,7 +172,7 @@ export default function Login({ setIsLoggedIn }) {
             {errors.password && <small style={{ color: '#dc143c', marginTop: '5px', display: 'block' }}>{errors.password}</small>}
           </div>
 
-          <button 
+          <button
             type="button"
             onClick={handleLogin}
             className="nav-btn primary"

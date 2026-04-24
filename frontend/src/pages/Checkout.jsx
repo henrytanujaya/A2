@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { useModal } from '../contexts/ModalContext';
 import { MapPin, CreditCard, User, Mail, Truck } from 'lucide-react';
+import axiosInstance from '../api/axiosInstance';
 
 export default function Checkout() {
   const { cart, clearCart } = useCart();
@@ -19,7 +20,7 @@ export default function Checkout() {
   const [voucher, setVoucher] = useState('');
   const [discount, setDiscount] = useState(0);
 
-  const total = cart.reduce((acc, item) => acc + item.price, 0);
+  const total = cart.reduce((acc, item) => acc + (item.price * (item.quantity || 1)), 0);
   const ppn = total * 0.11;
   const shippingCost = 25000;
   const grandTotal = total - discount + ppn + shippingCost;
@@ -54,7 +55,7 @@ export default function Checkout() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleCheckout = (e) => {
+  const handleCheckout = async (e) => {
     e.preventDefault();
     if (!formData.address) {
       showModal("Harap isi alamat pengiriman", 'error');
@@ -65,6 +66,7 @@ export default function Checkout() {
       return;
     }
 
+<<<<<<< HEAD
     const invoiceData = {
       invoiceId: `INV/${new Date().getFullYear()}${String(new Date().getMonth()+1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}/KTN-${Math.floor(Math.random() * 1000)}`,
       date: new Date().toLocaleString('id-ID'),
@@ -92,6 +94,64 @@ export default function Checkout() {
     localStorage.setItem('kitsune_orders', JSON.stringify(savedOrders));
 
     navigate('/invoice', { state: { invoiceData } });
+=======
+    try {
+      // 1. Create Order
+      const orderItems = cart.map(item => ({
+        productId: item.productId || null,
+        customOrderId: item.customOrderId || null,
+        quantity: item.quantity || 1
+      }));
+
+      const orderRes = await axiosInstance.post('/api/v1/orders', { 
+        items: orderItems,
+        shippingAddress: formData.address,
+        courierName: formData.courier
+      });
+      const orderData = orderRes.data.data;
+
+      // 2. Clear Cart Context/Backend
+      await clearCart();
+
+      // 3. Get Payment Token
+      const paymentRes = await axiosInstance.post('/api/v1/payments/token', {
+        orderId: orderData.orderId,
+        paymentMethod: 'Bank Transfer'
+      });
+
+      const paymentData = paymentRes.data.data;
+
+      // 4. Redirect to Payment Mock / Invoice
+      const invoiceData = {
+        invoiceId: `INV-${orderData.orderId}`,
+        date: new Date().toLocaleString('id-ID'),
+        customer: {
+          name: formData.name,
+          email: formData.email,
+          address: formData.address
+        },
+        items: [...cart],
+        summary: {
+          subtotal: total,
+          ppn: ppn,
+          shipping: shippingCost,
+          total: grandTotal
+        },
+        paymentMethod: 'Bank Transfer',
+        courier: formData.courier,
+        status: 'UNPAID',
+        paymentUrl: paymentData.paymentUrl
+      };
+
+      showModal('Order berhasil dibuat! Mengalihkan ke pembayaran...', 'success', () => {
+        navigate('/invoice', { state: { invoiceData } });
+      });
+
+    } catch (error) {
+      console.error('Checkout error:', error);
+      showModal('Gagal membuat pesanan. Silakan coba lagi.', 'error');
+    }
+>>>>>>> 6e98b621f7583ecbbe3430383e6593b38ec8a67d
   };
 
   if (cart.length === 0) {

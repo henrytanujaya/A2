@@ -85,6 +85,9 @@ public class ProductService {
         dto.setPrice(product.getPrice());
         dto.setStockQuantity(product.getStockQuantity());
         dto.setImageUrl(product.getImageUrl());
+        dto.setCreatedAt(product.getCreatedAt());
+        dto.setRating(product.getRating());
+        dto.setWeight(product.getWeight());
         return dto;
     }
 }

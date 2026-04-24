@@ -1,20 +1,15 @@
 package com.otaku.ecommerce.dto;
 
 import java.time.LocalDateTime;
-import jakarta.validation.constraints.Pattern;
 
 public class UserDTO {
     private Integer id;
-    
-    @Pattern(regexp = "^[a-zA-Z\\s\\-']+$", message = "Format nama tidak valid")
     private String name;
-    
-    @Pattern(regexp = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", message = "Format email tidak valid")
     private String email;
-    
-    @Pattern(regexp = "^(USER|ADMIN)$", message = "Role tidak valid")
     private String role;
     private LocalDateTime createdAt;
+    private String phone;
+    private String address;
 
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
@@ -26,4 +21,8 @@ public class UserDTO {
     public void setRole(String role) { this.role = role; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
 }

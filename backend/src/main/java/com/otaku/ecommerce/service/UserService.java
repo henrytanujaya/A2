@@ -47,6 +47,31 @@ public class UserService {
         userRepository.deleteById(id);
     }
 
+    // ─── Get Profile by Email ─────────────────────────────────────────────────
+    public UserDTO getProfileByEmail(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomBusinessException("OTK-4041", "User tidak ditemukan", 404));
+        return toDTO(user);
+    }
+
+    // ─── Update Profile ───────────────────────────────────────────────────────
+    public UserDTO updateProfile(String email, com.otaku.ecommerce.dto.UserProfileUpdateRequestDTO request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomBusinessException("OTK-4041", "User tidak ditemukan", 404));
+        
+        if (request.getName() != null && !request.getName().isBlank()) {
+            user.setName(request.getName());
+        }
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone());
+        }
+        if (request.getAddress() != null) {
+            user.setAddress(request.getAddress());
+        }
+
+        return toDTO(userRepository.save(user));
+    }
+
     // ─── Helper ───────────────────────────────────────────────────────────────
     private UserDTO toDTO(User user) {
         UserDTO dto = new UserDTO();
@@ -55,6 +80,8 @@ public class UserService {
         dto.setEmail(user.getEmail());
         dto.setRole(user.getRole());
         dto.setCreatedAt(user.getCreatedAt());
+        dto.setPhone(user.getPhone());
+        dto.setAddress(user.getAddress());
         return dto;
     }
 }

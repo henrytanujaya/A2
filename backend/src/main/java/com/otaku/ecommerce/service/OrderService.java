@@ -39,6 +39,7 @@ public class OrderService {
     @Autowired private ProductRepository      productRepository;
     @Autowired private CustomOrderRepository  customOrderRepository;
     @Autowired private DiscountRepository     discountRepository;
+    @Autowired private OrderTrackingRepository orderTrackingRepository;
 
     // ─── Create Order (dari email JWT, bukan userId dari body) ────────────────
     @SuppressWarnings("null")
@@ -59,6 +60,8 @@ public class OrderService {
         order.setCreatedAt(LocalDateTime.now());
         order.setTotalAmount(BigDecimal.ZERO);
         order.setFinalAmount(BigDecimal.ZERO);
+        order.setShippingAddress(request.getShippingAddress());
+        order.setCourierName(request.getCourierName());
 
         // Simpan order dahulu untuk mendapatkan ID
         order = orderRepository.save(order);
@@ -149,7 +152,9 @@ public class OrderService {
         if (finalAmount.compareTo(BigDecimal.ZERO) < 0) finalAmount = BigDecimal.ZERO;
 
         order.setFinalAmount(finalAmount);
-        orderRepository.save(order);
+        order = orderRepository.save(order);
+
+        addTrackingHistory(order.getId(), "Pending", "Pesanan berhasil dibuat, menunggu pembayaran");
 
         return buildResponse(order, appliedDiscount);
     }
@@ -189,8 +194,25 @@ public class OrderService {
                 "Status tidak bisa diubah dari '" + order.getStatus() + "' ke '" + newStatus + "'", 400);
         }
         order.setStatus(newStatus);
+        order.setUpdatedAt(LocalDateTime.now());
         orderRepository.save(order);
+        
+        addTrackingHistory(orderId, newStatus, "Status pesanan diperbarui menjadi: " + newStatus);
+        
         log.info("[ORDER-STATUS] Order {} diubah ke status {}", orderId, newStatus);
+    }
+
+    // ─── Order Tracking ───────────────────────────────────────────────────────
+    @Transactional
+    public void addTrackingHistory(Integer orderId, String status, String description) {
+        Order order = orderRepository.findById(orderId).orElse(null);
+        if (order != null) {
+            OrderTracking tracking = new OrderTracking();
+            tracking.setOrder(order);
+            tracking.setStatus(status);
+            tracking.setDescription(description);
+            orderTrackingRepository.save(tracking);
+        }
     }
 
     // ─── Helper ───────────────────────────────────────────────────────────────
@@ -201,6 +223,21 @@ public class OrderService {
         dto.setFinalAmount(order.getFinalAmount());
         dto.setStatus(order.getStatus());
         dto.setCreatedAt(order.getCreatedAt());
+        dto.setUpdatedAt(order.getUpdatedAt());
+        dto.setShippingAddress(order.getShippingAddress());
+        dto.setCourierName(order.getCourierName());
+        
+        List<com.otaku.ecommerce.dto.OrderTrackingDTO> trackingDTOs = orderTrackingRepository.findByOrderIdOrderByCreatedAtDesc(order.getId())
+                .stream().map(t -> {
+                    com.otaku.ecommerce.dto.OrderTrackingDTO td = new com.otaku.ecommerce.dto.OrderTrackingDTO();
+                    td.setId(t.getId());
+                    td.setStatus(t.getStatus());
+                    td.setDescription(t.getDescription());
+                    td.setCreatedAt(t.getCreatedAt());
+                    return td;
+                }).collect(Collectors.toList());
+        dto.setTrackingHistory(trackingDTOs);
+
         if (discount != null) dto.setDiscountCode(discount.getCode());
         return dto;
     }
