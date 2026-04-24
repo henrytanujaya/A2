@@ -42,6 +42,12 @@ public class Order {
     @Column(name = "CourierName", length = 50)
     private String courierName;
 
+    @Column(name = "CourierCode", length = 20)
+    private String courierCode;
+
+    @Column(name = "TrackingNumber", length = 50)
+    private String trackingNumber;
+
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
     public User getUser() { return user; }
@@ -62,4 +68,8 @@ public class Order {
     public void setShippingAddress(String shippingAddress) { this.shippingAddress = shippingAddress; }
     public String getCourierName() { return courierName; }
     public void setCourierName(String courierName) { this.courierName = courierName; }
+    public String getCourierCode() { return courierCode; }
+    public void setCourierCode(String courierCode) { this.courierCode = courierCode; }
+    public String getTrackingNumber() { return trackingNumber; }
+    public void setTrackingNumber(String trackingNumber) { this.trackingNumber = trackingNumber; }
 }

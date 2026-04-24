@@ -55,6 +55,7 @@ function AppContent() {
           <Route path="/my-orders" element={isLoggedIn ? <UserOrders /> : <Navigate to="/login" replace />} />
           <Route path="/checkout" element={isLoggedIn ? <Checkout /> : <Navigate to="/login" replace />} />
           <Route path="/invoice" element={isLoggedIn ? <InvoiceReceipt /> : <Navigate to="/login" replace />} />
+          <Route path="/invoice/:orderId" element={isLoggedIn ? <InvoiceReceipt /> : <Navigate to="/login" replace />} />
           <Route path="/login" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
           <Route path="/register" element={<Register />} />
           

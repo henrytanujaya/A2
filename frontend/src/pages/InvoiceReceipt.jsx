@@ -1,18 +1,79 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { useLocation, useNavigate, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation, useNavigate, Navigate, useParams } from 'react-router-dom';
 import { CheckCircle, Printer, ShoppingBag, ArrowLeft, Clock, CreditCard } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
 import { useModal } from '../contexts/ModalContext';
+import axiosInstance from '../api/axiosInstance';
+import { Truck, MapPin, Package, Calendar } from 'lucide-react';
 
 export default function InvoiceReceipt() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { orderId: paramOrderId } = useParams(); // For direct access via URL
   const invoiceData = location.state?.invoiceData;
   const [invoice, setInvoice] = useState(invoiceData);
   const [paymentMethod, setPaymentMethod] = useState('QRIS');
   const { clearCart } = useCart();
   const { showModal } = useModal();
+  const [trackingData, setTrackingData] = useState(null);
+  const [loadingTracking, setLoadingTracking] = useState(false);
+  const [showTracking, setShowTracking] = useState(false);
+  const [loadingInvoice, setLoadingInvoice] = useState(!invoiceData && !!paramOrderId);
+
+  useEffect(() => {
+    const fetchInvoiceDetails = async () => {
+      if (!invoice && paramOrderId) {
+        setLoadingInvoice(true);
+        try {
+          const res = await axiosInstance.get(`/api/v1/orders/${paramOrderId}`);
+          if (res.data.success) {
+            const order = res.data.data;
+            // Map OrderResponseDTO to the internal invoice structure used by this page
+            const mappedInvoice = {
+              orderId: order.orderId,
+              invoiceId: `INV-${order.orderId}`,
+              date: new Date(order.createdAt).toLocaleString('id-ID'),
+              status: order.status === 'Pending' ? 'UNPAID' : 'LUNAS',
+              paymentMethod: order.status === 'Pending' ? '-' : 'Transfer',
+              courier: order.courierName,
+              courierCode: order.courierCode,
+              trackingNumber: order.trackingNumber,
+              customer: {
+                name: order.shippingAddress.split('\n')[0] || 'User', // Simple fallback
+                email: '-',
+                address: order.shippingAddress
+              },
+              items: order.trackingHistory.length > 0 ? [] : [], // We might need more item details here, but for now we focus on status
+              summary: {
+                subtotal: order.totalAmount,
+                discount: order.totalAmount.subtract ? 0 : 0, // Placeholder
+                shipping: 25000,
+                ppn: order.totalAmount * 0.11,
+                total: order.finalAmount
+              }
+            };
+            setInvoice(mappedInvoice);
+          }
+        } catch (error) {
+          console.error("Failed to fetch invoice:", error);
+        } finally {
+          setLoadingInvoice(false);
+        }
+      }
+    };
+    fetchInvoiceDetails();
+  }, [paramOrderId, invoice]);
+
+  useEffect(() => {
+    if (invoice?.status === 'LUNAS' && invoice?.trackingNumber && !trackingData) {
+      fetchTracking();
+    }
+  }, [invoice, trackingData]);
+
+  if (loadingInvoice) {
+    return <div className="container" style={{ paddingTop: '150px', textAlign: 'center', color: '#fff' }}>Memuat Invoice...</div>;
+  }
 
   if (!invoice) {
     return <Navigate to="/" replace />;
@@ -25,18 +86,46 @@ export default function InvoiceReceipt() {
   };
 
   const handlePayment = () => {
+    // For demo purposes, we assign a dummy resi
+    const dummyResi = "JP8512345678"; // Example J&T Resi
+    const dummyCourier = "jnt";
+
     showModal(`Pembayaran sebesar Rp ${invoice.summary.total.toLocaleString('id-ID')} menggunakan ${paymentMethod} berhasil diproses!`, 'success', () => {
-      setInvoice(prev => ({ ...prev, status: 'LUNAS', paymentMethod }));
+      setInvoice(prev => ({ ...prev, status: 'LUNAS', paymentMethod, trackingNumber: dummyResi, courierCode: dummyCourier }));
       
-      // Update global orders
+      // Update global orders (local fallback)
       const savedOrders = JSON.parse(localStorage.getItem('kitsune_orders') || '[]');
       const updatedOrders = savedOrders.map(o => 
-        o.invoiceId === invoice.invoiceId ? { ...o, status: 'LUNAS', paymentMethod } : o
+        o.invoiceId === invoice.invoiceId ? { ...o, status: 'LUNAS', paymentMethod, trackingNumber: dummyResi, courierCode: dummyCourier } : o
       );
       localStorage.setItem('kitsune_orders', JSON.stringify(updatedOrders));
 
       clearCart();
     });
+  };
+
+  const fetchTracking = async () => {
+    if (!invoice.trackingNumber || !invoice.courierCode) {
+      return;
+    }
+
+    setLoadingTracking(true);
+    setShowTracking(true);
+    try {
+      const response = await axiosInstance.get(`/api/v1/tracking/${invoice.courierCode}/${invoice.trackingNumber}`);
+      if (response.data.success) {
+        setTrackingData(response.data.data.data);
+      } else {
+        showModal(response.data.message || "Gagal melacak paket", "error");
+        setShowTracking(false);
+      }
+    } catch (error) {
+      console.error("Tracking fetch error:", error);
+      showModal("Terjadi kesalahan saat menghubungi server tracking.", "error");
+      setShowTracking(false);
+    } finally {
+      setLoadingTracking(false);
+    }
   };
 
   return (
@@ -162,7 +251,12 @@ export default function InvoiceReceipt() {
           {isPaid ? (
             <>
               <p style={{ margin: '0 0 5px 0' }}>Terima kasih atas pesanan Anda!</p>
-              <p style={{ margin: 0 }}>Pesanan akan segera diproses dan dikirim ke alamat tujuan.</p>
+              {invoice.trackingNumber && (
+                <p style={{ margin: '5px 0 0 0', fontWeight: 'bold', color: 'var(--accent-crimson)' }}>
+                  No. Resi: {invoice.trackingNumber} ({invoice.courierCode?.toUpperCase()})
+                </p>
+              )}
+              <p style={{ margin: '5px 0 0 0' }}>Pesanan akan segera diproses dan dikirim ke alamat tujuan.</p>
             </>
           ) : (
             <p style={{ margin: 0 }}>Silakan selesaikan pembayaran agar pesanan dapat diproses.</p>
@@ -170,6 +264,48 @@ export default function InvoiceReceipt() {
         </div>
 
       </motion.div>
+
+      {/* Tracking Section */}
+      {showTracking && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          style={{ width: '100%', maxWidth: '600px', marginTop: '20px', background: '#fff', borderRadius: '10px', padding: '25px', color: '#111', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}><Truck color="var(--accent-crimson)" /> Lacak Pesanan</h3>
+            <button onClick={() => setShowTracking(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#888' }}>&times;</button>
+          </div>
+
+          {loadingTracking ? (
+            <div style={{ textAlign: 'center', padding: '30px' }}>
+              <div className="spinner" style={{ border: '3px solid #f3f3f3', borderTop: '3px solid var(--accent-crimson)', borderRadius: '50%', width: '30px', height: '30px', animation: 'spin 1s linear infinite', margin: '0 auto 15px' }}></div>
+              <p style={{ fontSize: '0.9rem', color: '#666' }}>Menghubungkan ke BinderByte...</p>
+            </div>
+          ) : trackingData ? (
+            <div style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '10px' }}>
+              <div style={{ marginBottom: '20px', padding: '15px', background: 'rgba(220, 20, 60, 0.05)', borderRadius: '8px', fontSize: '0.9rem' }}>
+                <p style={{ margin: '0 0 5px 0' }}><strong>Status:</strong> {trackingData.summary.status}</p>
+                <p style={{ margin: 0 }}><strong>Kurir:</strong> {trackingData.summary.courier} ({trackingData.summary.service})</p>
+              </div>
+
+              <div style={{ position: 'relative', paddingLeft: '30px' }}>
+                <div style={{ position: 'absolute', left: '7px', top: '5px', bottom: '5px', width: '2px', background: '#eee' }}></div>
+                {trackingData.history.map((h, i) => (
+                  <div key={i} style={{ position: 'relative', marginBottom: '20px' }}>
+                    <div style={{ position: 'absolute', left: '-27px', top: '0', width: '12px', height: '12px', borderRadius: '50%', background: i === 0 ? 'var(--accent-crimson)' : '#ccc', border: '3px solid #fff', boxShadow: '0 0 0 2px ' + (i === 0 ? 'rgba(220, 20, 60, 0.2)' : '#eee'), zIndex: 2 }}></div>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '0.85rem', fontWeight: 'bold', color: i === 0 ? 'var(--accent-crimson)' : '#333' }}>{h.date}</p>
+                    <p style={{ margin: '0', fontSize: '0.9rem', color: '#555', lineHeight: '1.4' }}>{h.desc}</p>
+                    {h.location && <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={12} /> {h.location}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p style={{ textAlign: 'center', color: '#888' }}>Data tidak ditemukan</p>
+          )}
+        </motion.div>
+      )}
 
       {/* Payment or Action Buttons */}
       <div className="no-print" style={{ width: '100%', maxWidth: '600px', marginTop: '20px' }}>
@@ -215,11 +351,33 @@ export default function InvoiceReceipt() {
             >
               <ArrowLeft size={18} /> Ke Profil
             </button>
+            {isPaid && (invoice.trackingNumber) && (
+              <button 
+                onClick={fetchTracking}
+                className="nav-btn primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 25px', border: 'none', cursor: 'pointer', borderRadius: '8px', fontWeight: 'bold', width: '100%', marginTop: '10px', justifyContent: 'center' }}
+              >
+                <Truck size={18} /> Lacak Paket (Real-time)
+              </button>
+            )}
           </div>
         )}
       </div>
 
       <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .spinner {
+          border: 3px solid #f3f3f3;
+          border-top: 3px solid var(--accent-crimson);
+          border-radius: 50%;
+          width: 30px;
+          height: 30px;
+          animation: spin 1s linear infinite;
+          margin: 0 auto 15px;
+        }
         @media print {
           body * {
             visibility: hidden;

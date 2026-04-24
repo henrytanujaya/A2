@@ -33,14 +33,14 @@ export default function Home() {
       {/* Hero Section */}
       <section className="hero">
         <div className="container" style={{ position: 'relative', zIndex: 10 }}>
-          <motion.div 
+          <motion.div
             className="hero-content"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1 }}
           >
-            <h1 className="hero-title">Fall Into The Spirit World: <br/> <span className="text-crimson">New Yokai Merch & Manga</span></h1>
-            <p className="hero-subtitle">Mistis, Premium, Responsive. Eksplorasi koleksi eksklusif budaya jejepangan kami dengan pengiriman ke seluruh dunia.</p>
+            <h1 className="hero-title">Fall Into The Spirit World: <br /> <span className="text-crimson">New Yokai Merch & Manga</span></h1>
+            <p className="hero-subtitle">Mistis, Premium, Responsive. Eksplorasi koleksi eksklusif budaya jepang kami dengan pengiriman ke seluruh Indonesia.</p>
           </motion.div>
         </div>
       </section>
@@ -61,8 +61,8 @@ export default function Home() {
           ) : (
             <div className="product-grid">
               {topProducts.map((product, index) => (
-                <motion.div 
-                  className="product-card" 
+                <motion.div
+                  className="product-card"
                   key={product.id}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
@@ -75,14 +75,14 @@ export default function Home() {
                   <div className="product-info">
                     <h3 className="product-title">{product.name}</h3>
                     <p className="product-price">Rp {product.price.toLocaleString('id-ID')}</p>
-                    
+
                     <div style={{ display: 'flex', gap: '2px', marginBottom: '15px', color: '#f59e0b' }}>
                       {[...Array(product.rating || 5)].map((_, i) => (
                         <span key={i}>★</span>
                       ))}
                     </div>
 
-                    <button 
+                    <button
                       className="add-to-cart-btn"
                       onClick={() => addToCart({
                         productId: product.id,

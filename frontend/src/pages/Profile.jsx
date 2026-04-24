@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, MapPin, Phone, Package, Edit2, Check, X, Clock } from 'lucide-react';
+import { User, Mail, MapPin, Phone, Package, Edit2, Check, X, Clock, Truck } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import axiosInstance from '../api/axiosInstance';
 import { useModal } from '../contexts/ModalContext';
 
@@ -9,6 +10,9 @@ export default function Profile() {
   const [profileData, setProfileData] = useState({ name: '', email: '', phone: '', address: '' });
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [trackingData, setTrackingData] = useState(null);
+  const [loadingTracking, setLoadingTracking] = useState(false);
+  const [activeTrackingOrderId, setActiveTrackingOrderId] = useState(null);
 
   const fetchProfileAndOrders = async () => {
     setLoading(true);
@@ -66,6 +70,31 @@ export default function Profile() {
     } catch (error) {
       console.error("Failed to update profile:", error);
       showModal('Gagal memperbarui profil.', 'error');
+    }
+  };
+
+  const fetchTracking = async (courier, awb, orderId) => {
+    if (!awb || !courier) {
+      showModal("Nomor resi belum tersedia untuk pesanan ini.", "error");
+      return;
+    }
+
+    setLoadingTracking(true);
+    setActiveTrackingOrderId(orderId);
+    try {
+      const response = await axiosInstance.get(`/api/v1/tracking/${courier}/${awb}`);
+      if (response.data.success) {
+        setTrackingData(response.data.data.data);
+      } else {
+        showModal(response.data.message || "Gagal melacak paket. Pastikan nomor resi valid.", "error");
+        setActiveTrackingOrderId(null);
+      }
+    } catch (error) {
+      console.error("Tracking error:", error);
+      showModal("Terjadi kesalahan saat menghubungi server tracking.", "error");
+      setActiveTrackingOrderId(null);
+    } finally {
+      setLoadingTracking(false);
     }
   };
 
@@ -184,38 +213,33 @@ export default function Profile() {
             <h2 style={{ fontSize: '1.4rem' }}>Riwayat Pesanan</h2>
           </div>
 
-          {orders.length === 0 ? (
+          {orders.filter(o => o.status !== 'Pending').length === 0 ? (
             <div style={{ textAlign: 'center', padding: '50px 20px', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: '1px dashed #444' }}>
               <Package size={64} color="#444" style={{ marginBottom: '15px' }} />
-              <h3 style={{ color: '#888', marginBottom: '10px' }}>Belum ada pesanan</h3>
-              <p style={{ color: '#666', fontSize: '0.9rem', lineHeight: '1.4' }}>Pakaian kustom eksklusif dan koleksi manga Anda akan tercatat di sini setelah melakukan pembayaran.</p>
+              <h3 style={{ color: '#888', marginBottom: '10px' }}>Belum ada riwayat pesanan</h3>
+              <p style={{ color: '#666', fontSize: '0.9rem', lineHeight: '1.4' }}>Pesanan yang sudah dibayar akan muncul di sini untuk Anda lacak.</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {orders.map((order, idx) => (
+              {orders.filter(o => o.status !== 'Pending').map((order, idx) => (
                 <div key={idx} style={{ background: 'rgba(0,0,0,0.2)', padding: '20px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                     <div style={{ fontWeight: 'bold' }}>Order #{order.orderId}</div>
                     <div style={{ color: '#ff2a5f', fontWeight: 'bold' }}>Rp {order.finalAmount.toLocaleString('id-ID')}</div>
                   </div>
-                  <div style={{ fontSize: '0.85rem', color: '#888', marginBottom: '15px' }}>{new Date(order.createdAt).toLocaleString('id-ID')}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <div style={{ fontSize: '0.85rem', color: '#888' }}>{new Date(order.createdAt).toLocaleString('id-ID')}</div>
+                    <span style={{ padding: '4px 10px', background: 'rgba(46, 204, 113, 0.1)', color: '#2ecc71', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>{order.status.toUpperCase()}</span>
+                  </div>
                   
-                  {/* Status Timeline */}
-                  {order.trackingHistory && order.trackingHistory.length > 0 && (
-                    <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px dashed #444' }}>
-                      <h4 style={{ fontSize: '0.9rem', marginBottom: '10px', color: '#ccc' }}><Clock size={14} style={{ display: 'inline', marginRight: '5px' }}/> Status Tracking</h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingLeft: '10px', borderLeft: '2px solid #ff2a5f' }}>
-                        {order.trackingHistory.map((track, tidx) => (
-                          <div key={tidx} style={{ position: 'relative', paddingLeft: '15px' }}>
-                            <div style={{ position: 'absolute', left: '-16px', top: '2px', width: '10px', height: '10px', borderRadius: '50%', background: '#ff2a5f' }}></div>
-                            <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#fff' }}>{track.status}</div>
-                            <div style={{ fontSize: '0.8rem', color: '#888' }}>{new Date(track.createdAt).toLocaleString('id-ID')}</div>
-                            <div style={{ fontSize: '0.8rem', color: '#aaa', marginTop: '3px' }}>{track.description}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <button 
+                    onClick={() => navigate(`/invoice/${order.orderId}`)}
+                    style={{ width: '100%', padding: '10px', background: 'transparent', border: '1px solid #ff2a5f', color: '#ff2a5f', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#ff2a5f'; e.currentTarget.style.color = '#fff'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#ff2a5f'; }}
+                  >
+                    Lihat Detail & Lacak Resi
+                  </button>
                 </div>
               ))}
             </div>

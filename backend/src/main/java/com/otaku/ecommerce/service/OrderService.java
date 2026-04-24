@@ -226,6 +226,8 @@ public class OrderService {
         dto.setUpdatedAt(order.getUpdatedAt());
         dto.setShippingAddress(order.getShippingAddress());
         dto.setCourierName(order.getCourierName());
+        dto.setCourierCode(order.getCourierCode());
+        dto.setTrackingNumber(order.getTrackingNumber());
         
         List<com.otaku.ecommerce.dto.OrderTrackingDTO> trackingDTOs = orderTrackingRepository.findByOrderIdOrderByCreatedAtDesc(order.getId())
                 .stream().map(t -> {

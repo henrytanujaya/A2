@@ -66,35 +66,6 @@ export default function Checkout() {
       return;
     }
 
-<<<<<<< HEAD
-    const invoiceData = {
-      invoiceId: `INV/${new Date().getFullYear()}${String(new Date().getMonth()+1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}/KTN-${Math.floor(Math.random() * 1000)}`,
-      date: new Date().toLocaleString('id-ID'),
-      customer: {
-        name: formData.name,
-        email: formData.email,
-        address: formData.address
-      },
-      items: [...cart],
-      summary: {
-        subtotal: total,
-        discount: discount,
-        ppn: ppn,
-        shipping: shippingCost,
-        total: grandTotal
-      },
-      paymentMethod: null,
-      courier: formData.courier,
-      status: 'UNPAID'
-    };
-
-    // Save to global orders
-    const savedOrders = JSON.parse(localStorage.getItem('kitsune_orders') || '[]');
-    savedOrders.push(invoiceData);
-    localStorage.setItem('kitsune_orders', JSON.stringify(savedOrders));
-
-    navigate('/invoice', { state: { invoiceData } });
-=======
     try {
       // 1. Create Order
       const orderItems = cart.map(item => ({
@@ -103,7 +74,7 @@ export default function Checkout() {
         quantity: item.quantity || 1
       }));
 
-      const orderRes = await axiosInstance.post('/api/v1/orders', { 
+      const orderRes = await axiosInstance.post('/api/v1/orders', {
         items: orderItems,
         shippingAddress: formData.address,
         courierName: formData.courier
@@ -124,6 +95,7 @@ export default function Checkout() {
       // 4. Redirect to Payment Mock / Invoice
       const invoiceData = {
         invoiceId: `INV-${orderData.orderId}`,
+        orderId: orderData.orderId,
         date: new Date().toLocaleString('id-ID'),
         customer: {
           name: formData.name,
@@ -151,7 +123,6 @@ export default function Checkout() {
       console.error('Checkout error:', error);
       showModal('Gagal membuat pesanan. Silakan coba lagi.', 'error');
     }
->>>>>>> 6e98b621f7583ecbbe3430383e6593b38ec8a67d
   };
 
   if (cart.length === 0) {
@@ -166,12 +137,12 @@ export default function Checkout() {
   return (
     <div className="container" style={{ paddingTop: '100px', paddingBottom: '50px', minHeight: '80vh', position: 'relative', zIndex: 10 }}>
       <h1 className="section-title" style={{ textAlign: 'left', marginBottom: '30px' }}>Checkout</h1>
-      
+
       <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
         {/* Form Area */}
         <div style={{ flex: '1 1 600px' }}>
           <form onSubmit={handleCheckout} style={{ background: 'var(--card-bg)', padding: '30px', borderRadius: '15px', border: '1px solid rgba(255,255,255,0.1)' }}>
-            
+
             <h2 style={{ fontSize: '1.2rem', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}><User size={20} color="#dc143c" /> Informasi Pembeli</h2>
             <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
               <div style={{ flex: 1 }}>
@@ -211,7 +182,7 @@ export default function Checkout() {
         <div style={{ flex: '1 1 350px' }}>
           <div style={{ background: 'var(--card-bg)', padding: '25px', borderRadius: '15px', border: '1px solid rgba(255,255,255,0.1)', position: 'sticky', top: '100px' }}>
             <h2 style={{ fontSize: '1.4rem', marginBottom: '20px' }}>Ringkasan Pesanan</h2>
-            
+
             <div style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '20px', paddingRight: '10px' }}>
               {cart.map((item, idx) => (
                 <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -242,7 +213,7 @@ export default function Checkout() {
               <span>PPN (11%)</span>
               <span>Rp {ppn.toLocaleString('id-ID')}</span>
             </div>
-            
+
             <hr style={{ borderColor: 'rgba(255,255,255,0.1)', marginBottom: '15px' }} />
 
             <div style={{ marginBottom: '20px' }}>
@@ -252,7 +223,7 @@ export default function Checkout() {
                 <button type="button" onClick={handleApplyVoucher} style={{ padding: '10px 15px', background: 'rgba(255, 255, 255, 0.1)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Terapkan</button>
               </div>
             </div>
-            
+
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--accent-crimson)' }}>
               <span>Total Pembayaran</span>
               <span>Rp {grandTotal.toLocaleString('id-ID')}</span>

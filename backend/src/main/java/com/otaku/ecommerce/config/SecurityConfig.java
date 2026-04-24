@@ -59,6 +59,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/orders/**").hasAnyRole("Customer", "Admin")
                         .requestMatchers("/api/v1/custom-orders/**").hasAnyRole("Customer", "Admin")
                         .requestMatchers("/api/v1/upload/**").hasAnyRole("Customer", "Admin")
+                        .requestMatchers("/api/v1/tracking/**").hasAnyRole("Customer", "Admin")
                         // ─── Semua yang lain wajib auth ───────────────────────
                         .anyRequest().authenticated())
                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)

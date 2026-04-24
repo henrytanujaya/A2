@@ -14,6 +14,8 @@ public class OrderResponseDTO {
     private String discountCode;
     private String shippingAddress;
     private String courierName;
+    private String courierCode;
+    private String trackingNumber;
     private List<OrderTrackingDTO> trackingHistory;
 
     public Integer getOrderId() { return orderId; }
@@ -34,6 +36,10 @@ public class OrderResponseDTO {
     public void setShippingAddress(String shippingAddress) { this.shippingAddress = shippingAddress; }
     public String getCourierName() { return courierName; }
     public void setCourierName(String courierName) { this.courierName = courierName; }
+    public String getCourierCode() { return courierCode; }
+    public void setCourierCode(String courierCode) { this.courierCode = courierCode; }
+    public String getTrackingNumber() { return trackingNumber; }
+    public void setTrackingNumber(String trackingNumber) { this.trackingNumber = trackingNumber; }
     public List<OrderTrackingDTO> getTrackingHistory() { return trackingHistory; }
     public void setTrackingHistory(List<OrderTrackingDTO> trackingHistory) { this.trackingHistory = trackingHistory; }
 }
