@@ -26,11 +26,12 @@ public class OrderService {
 
     // Validasi transisi status order
     private static final Map<String, List<String>> VALID_TRANSITIONS = Map.of(
-        "Pending",    List.of("Processing", "Cancelled"),
-        "Processing", List.of("Shipped", "Cancelled"),
-        "Shipped",    List.of("Completed"),
-        "Completed",  List.of(),
-        "Cancelled",  List.of()
+        "Pending",              List.of("Waiting_Verification", "Processing", "Cancelled"),
+        "Waiting_Verification", List.of("Processing", "Cancelled"),
+        "Processing",           List.of("Shipped", "Cancelled"),
+        "Shipped",              List.of("Completed"),
+        "Completed",            List.of(),
+        "Cancelled",            List.of()
     );
 
     @Autowired private OrderRepository        orderRepository;
@@ -62,6 +63,7 @@ public class OrderService {
         order.setFinalAmount(BigDecimal.ZERO);
         order.setShippingAddress(request.getShippingAddress());
         order.setCourierName(request.getCourierName());
+        order.setCourierCode(request.getCourierCode());
 
         // Simpan order dahulu untuk mendapatkan ID
         order = orderRepository.save(order);
@@ -174,7 +176,6 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
-    // ─── Get All Orders (Admin) ───────────────────────────────────────────────
     public List<OrderResponseDTO> getAllOrders() {
         return orderRepository.findAll().stream()
                 .map(o -> buildResponse(o, o.getDiscount()))
@@ -222,6 +223,27 @@ public class OrderService {
             tracking.setStatus(status);
             tracking.setDescription(description);
             orderTrackingRepository.save(tracking);
+        }
+    }
+
+    @Transactional
+    public void addTrackingHistoryByWaybill(String waybillId, String status, String description) {
+        if (waybillId == null || waybillId.isEmpty()) return;
+        Order order = orderRepository.findByTrackingNumber(waybillId).orElse(null);
+        if (order != null) {
+            OrderTracking tracking = new OrderTracking();
+            tracking.setOrder(order);
+            tracking.setStatus(status);
+            tracking.setDescription(description);
+            orderTrackingRepository.save(tracking);
+            
+            // Opsional: perbarui status order jika paket Delivered
+            if ("delivered".equalsIgnoreCase(status) && !"Completed".equals(order.getStatus())) {
+                order.setStatus("Completed");
+                orderRepository.save(order);
+            }
+        } else {
+            log.warn("[WEBHOOK] Order dengan resi {} tidak ditemukan.", waybillId);
         }
     }
 

@@ -13,4 +13,6 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     List<Order> findByUserEmail(String email);
 
     List<Order> findByStatusAndCreatedAtBefore(String status, LocalDateTime cutoff);
+
+    java.util.Optional<Order> findByTrackingNumber(String trackingNumber);
 }

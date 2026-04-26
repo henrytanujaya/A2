@@ -50,7 +50,7 @@ export default function Cart() {
 
                 {/* Remove Act */}
                 <button 
-                  onClick={() => removeFromCart(item.cartId)}
+                  onClick={() => removeFromCart(item.id)}
                   style={{ background: 'rgba(255, 68, 68, 0.1)', color: '#ff4444', border: '1px solid #ff4444', 
                            padding: '10px', borderRadius: '8px', cursor: 'pointer', display: 'flex', transition: 'all 0.2s ease' }}
                   title="Hapus Item"

@@ -8,6 +8,7 @@ export default function Profile() {
   const { showModal } = useModal();
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState({ name: '', email: '', phone: '', address: '' });
+  const [loading, setLoading] = useState(true);
   const fetchProfile = async () => {
     setLoading(true);
     try {
@@ -169,7 +170,5 @@ export default function Profile() {
         </div>
       </div>
     </div>
-  );
-}
   );
 }

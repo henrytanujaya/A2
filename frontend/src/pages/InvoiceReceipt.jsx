@@ -34,8 +34,9 @@ export default function InvoiceReceipt() {
               orderId: order.orderId,
               invoiceId: `INV-${order.orderId}`,
               date: new Date(order.createdAt).toLocaleString('id-ID'),
-              status: order.status === 'Pending' ? 'UNPAID' : 'LUNAS',
-              paymentMethod: order.status === 'Pending' ? '-' : 'Transfer',
+              status: order.status === 'Pending' ? 'UNPAID' : 
+                      order.status === 'Waiting_Verification' ? 'WAITING' : 'LUNAS',
+              paymentMethod: (order.status === 'Pending' || order.status === 'Waiting_Verification') ? '-' : 'Transfer',
               courier: order.courierName,
               courierCode: order.courierCode,
               trackingNumber: order.trackingNumber,
@@ -80,29 +81,23 @@ export default function InvoiceReceipt() {
   }
 
   const isPaid = invoice.status === 'LUNAS';
+  const isWaiting = invoice.status === 'WAITING';
 
   const handlePrint = () => {
     window.print();
   };
 
   const handlePayment = async () => {
-    // For demo purposes, we assign a dummy resi
-    const dummyResi = "MOCK123"; // Use MOCK123 for testing
-    const dummyCourier = "jnt";
-
     try {
-      // 1. Sync with backend
+      // 1. Sync with backend - Update status to Waiting_Verification
       await axiosInstance.patch(`/api/v1/orders/${invoice.orderId}/status`, null, {
         params: {
-          status: 'Processing',
-          courierCode: dummyCourier,
-          trackingNumber: dummyResi
+          status: 'Waiting_Verification'
         }
       });
 
-      showModal(`Pembayaran sebesar Rp ${invoice.summary.total.toLocaleString('id-ID')} menggunakan ${paymentMethod} berhasil diproses!`, 'success', () => {
-        setInvoice(prev => ({ ...prev, status: 'LUNAS', paymentMethod, trackingNumber: dummyResi, courierCode: dummyCourier }));
-        
+      showModal(`Pembayaran sebesar Rp ${invoice.summary.total.toLocaleString('id-ID')} menggunakan ${paymentMethod} berhasil dikirim! Mohon tunggu verifikasi Admin.`, 'success', () => {
+        setInvoice(prev => ({ ...prev, status: 'WAITING', paymentMethod }));
         clearCart();
       });
     } catch (error) {
@@ -180,6 +175,10 @@ export default function InvoiceReceipt() {
               <div style={{ display: 'inline-block', marginTop: '10px', padding: '4px 10px', background: 'rgba(46, 204, 113, 0.1)', color: '#2ecc71', border: '1px solid #2ecc71', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
                 LUNAS
               </div>
+            ) : isWaiting ? (
+              <div style={{ display: 'inline-block', marginTop: '10px', padding: '4px 10px', background: 'rgba(52, 152, 219, 0.1)', color: '#3498db', border: '1px solid #3498db', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                MENUNGGU VERIFIKASI
+              </div>
             ) : (
               <div style={{ display: 'inline-block', marginTop: '10px', padding: '4px 10px', background: 'rgba(241, 196, 15, 0.1)', color: '#f39c12', border: '1px solid #f1c40f', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
                 BELUM DIBAYAR
@@ -246,7 +245,7 @@ export default function InvoiceReceipt() {
               <span>Total Akhir</span>
               <span>Rp {invoice.summary.total.toLocaleString('id-ID')}</span>
             </div>
-            {isPaid && (
+            {(isPaid || isWaiting) && (
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '0.85rem', color: '#777' }}>
                 <span>Metode Pembayaran</span>
                 <span style={{ fontWeight: 'bold' }}>{invoice.paymentMethod}</span>
@@ -267,6 +266,8 @@ export default function InvoiceReceipt() {
               )}
               <p style={{ margin: '5px 0 0 0' }}>Pesanan akan segera diproses dan dikirim ke alamat tujuan.</p>
             </>
+          ) : isWaiting ? (
+            <p style={{ margin: 0 }}>Pembayaran Anda sedang dalam verifikasi oleh Admin.</p>
           ) : (
             <p style={{ margin: 0 }}>Silakan selesaikan pembayaran agar pesanan dapat diproses.</p>
           )}
@@ -318,7 +319,7 @@ export default function InvoiceReceipt() {
 
       {/* Payment or Action Buttons */}
       <div className="no-print" style={{ width: '100%', maxWidth: '600px', marginTop: '20px' }}>
-        {!isPaid ? (
+        {!isPaid && !isWaiting ? (
           <div style={{ background: 'var(--card-bg)', padding: '25px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)' }}>
             <h3 style={{ marginBottom: '15px', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}><CreditCard size={20} color="#dc143c" /> Pilih Metode Pembayaran</h3>
             <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid #444', color: '#fff', borderRadius: '8px', marginBottom: '20px' }}>

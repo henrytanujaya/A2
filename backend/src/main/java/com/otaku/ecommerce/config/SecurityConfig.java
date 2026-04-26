@@ -19,6 +19,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.Arrays;
 
 @Configuration
@@ -37,13 +38,22 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setContentType("application/json");
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.getWriter().write("{\"success\":false,\"message\":\"Unauthorized: Token invalid atau expired.\"}");
+                        })
+                )
                 .authorizeHttpRequests(auth -> auth
                         // ─── Public (Tanpa Auth) ─────────────────────────────
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/", "/error", "/uploads/**").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/discounts/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/shipping/**").permitAll()
                         // ─── Swagger / OpenAPI ───
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         // ─── Admin Only ───────────────────────────────────────
@@ -56,6 +66,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/v1/discounts/**").hasRole("Admin")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/discounts/**").hasRole("Admin")
                         // ─── Customer + Admin ─────────────────────────────────
+                        .requestMatchers("/api/v1/orders/all").hasRole("Admin")
                         .requestMatchers("/api/v1/orders/**").hasAnyRole("Customer", "Admin")
                         .requestMatchers("/api/v1/custom-orders/**").hasAnyRole("Customer", "Admin")
                         .requestMatchers("/api/v1/upload/**").hasAnyRole("Customer", "Admin")

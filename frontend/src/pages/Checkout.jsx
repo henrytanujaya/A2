@@ -6,7 +6,8 @@ import { useModal } from '../contexts/ModalContext';
 import { MapPin, CreditCard, User, Mail, Truck, Loader2, ChevronDown, CheckCircle } from 'lucide-react';
 import axiosInstance from '../api/axiosInstance';
 
-const SHOP_ORIGIN_ID = "155"; // Jakarta Timur ID (BinderByte)
+// Origin toko: Cilincing, Kalibaru, Jakarta Utara (ID Biteship)
+const SHOP_ORIGIN_ID = "IDNP6IDNC150IDND881IDZ14110";
 
 export default function Checkout() {
   const { cart, clearCart } = useCart();
@@ -30,7 +31,7 @@ export default function Checkout() {
   const [shippingOptions, setShippingOptions] = useState([]);
   const [selectedOption, setSelectedOption] = useState(null);
   const [loadingShipping, setLoadingShipping] = useState(false);
-  const [loadingCities, setLoadingCities] = useState(true);
+  const [loadingCities, setLoadingCities] = useState(false);
 
   const [voucher, setVoucher] = useState('');
   const [discount, setDiscount] = useState(0);
@@ -39,27 +40,10 @@ export default function Checkout() {
   const subtotal = cart.reduce((acc, item) => acc + (item.price * (item.quantity || 1)), 0);
   const totalWeight = cart.reduce((acc, item) => acc + ((item.weight || 500) * (item.quantity || 1)), 0);
   const ppn = subtotal * 0.11;
-  const shippingFee = selectedOption ? selectedOption.cost : 0;
+  const shippingFee = selectedOption ? selectedOption.price : 0;
   const grandTotal = subtotal - discount + ppn + shippingFee;
 
   useEffect(() => {
-    // Fetch Cities
-    const fetchCities = async () => {
-      try {
-        const res = await axiosInstance.get('/api/v1/shipping/cities');
-        if (res.data.success) {
-          setCities(res.data.data);
-          setFilteredCities(res.data.data);
-        }
-      } catch (error) {
-        console.error("Fetch cities error:", error);
-      } finally {
-        setLoadingCities(false);
-      }
-    };
-
-    fetchCities();
-
     // User Data
     const savedUser = localStorage.getItem('userData');
     if (savedUser) {
@@ -73,14 +57,29 @@ export default function Checkout() {
     }
   }, []);
 
-  // Handle City Search
+  // Handle City Search (Debounced Autocomplete Biteship)
   useEffect(() => {
-    if (citySearch.length > 1) {
-      setFilteredCities(cities.filter(c => c.name.toLowerCase().includes(citySearch.toLowerCase())));
+    if (citySearch.length >= 3) {
+      const delayDebounceFn = setTimeout(async () => {
+        setLoadingCities(true);
+        try {
+          const res = await axiosInstance.get(`/api/v1/shipping/areas?query=${citySearch}`);
+          if (res.data.success) {
+            setFilteredCities(res.data.data.areas || []);
+          }
+        } catch (error) {
+          console.error("Fetch areas error:", error);
+          setFilteredCities([]);
+        } finally {
+          setLoadingCities(false);
+        }
+      }, 500);
+
+      return () => clearTimeout(delayDebounceFn);
     } else {
-      setFilteredCities(cities);
+      setFilteredCities([]);
     }
-  }, [citySearch, cities]);
+  }, [citySearch]);
 
   // Fetch Shipping Costs when city or courier changes
   useEffect(() => {
@@ -95,17 +94,15 @@ export default function Checkout() {
     try {
       const res = await axiosInstance.get('/api/v1/shipping/cost', {
         params: {
-          origin: SHOP_ORIGIN_ID,
           destination: selectedCity.id,
           weight: totalWeight,
           courier: formData.courier.toLowerCase()
         }
       });
-      if (res.data.success && res.data.data.data?.costs) {
-        setShippingOptions(res.data.data.data.costs);
-        // Default select first option
-        if (res.data.data.data.costs.length > 0) {
-          setSelectedOption(res.data.data.data.costs[0]);
+      if (res.data.success && res.data.data?.couriers) {
+        setShippingOptions(res.data.data.couriers);
+        if (res.data.data.couriers.length > 0) {
+          setSelectedOption(res.data.data.couriers[0]);
         }
       } else {
         setShippingOptions([]);
@@ -156,14 +153,10 @@ export default function Checkout() {
       const orderRes = await axiosInstance.post('/api/v1/orders', {
         items: orderItems,
         shippingAddress: fullAddress,
-        courierName: `${formData.courier.toUpperCase()} - ${selectedOption.service}`
+        courierName: `${(selectedOption.courierName || formData.courier).toUpperCase()} - ${selectedOption.serviceName}`,
+        courierCode: formData.courier.toLowerCase()
       });
       const orderData = orderRes.data.data;
-
-      // Update order details with final costs and tracking info later
-      await axiosInstance.patch(`/api/v1/orders/${orderData.orderId}/status`, null, {
-          params: { courierCode: formData.courier.toLowerCase() }
-      });
 
       await clearCart();
 
@@ -255,20 +248,24 @@ export default function Checkout() {
                       }}
                     >
                       <input 
-                        type="text" autoFocus placeholder="Ketik nama kota..." 
+                        type="text" autoFocus placeholder="Ketik min. 3 huruf nama kota/kecamatan..." 
                         value={citySearch} onChange={(e) => setCitySearch(e.target.value)}
                         style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', borderBottom: '1px solid #333', color: '#fff' }}
                       />
-                      {loadingCities ? (
+                      {citySearch.length < 3 ? (
+                        <div style={{ padding: '12px', color: '#555', fontSize: '0.85rem', textAlign: 'center' }}>✏️ Ketik minimal 3 huruf untuk mencari kota...</div>
+                      ) : loadingCities ? (
                         <div style={{ padding: '10px', textAlign: 'center' }}><Loader2 className="spinner" size={16} /></div>
+                      ) : filteredCities.length === 0 ? (
+                        <div style={{ padding: '12px', color: '#555', fontSize: '0.85rem', textAlign: 'center' }}>Kota tidak ditemukan. Coba kata kunci lain.</div>
                       ) : (
                         filteredCities.map(city => (
                           <div 
                             key={city.id} 
-                            onClick={() => { setSelectedCity(city); setShowCityDropdown(false); }}
-                            style={{ padding: '10px', cursor: 'pointer', transition: '0.2s', background: selectedCity?.id === city.id ? '#333' : 'transparent' }}
-                            onMouseEnter={(e) => e.target.style.background = '#222'}
-                            onMouseLeave={(e) => e.target.style.background = selectedCity?.id === city.id ? '#333' : 'transparent'}
+                            onClick={() => { setSelectedCity(city); setShowCityDropdown(false); setCitySearch(''); }}
+                            style={{ padding: '10px', cursor: 'pointer', transition: '0.2s', background: selectedCity?.id === city.id ? '#333' : 'transparent', fontSize: '0.875rem', lineHeight: '1.4' }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#222'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = selectedCity?.id === city.id ? '#333' : 'transparent'}
                           >
                             {city.name}
                           </div>
@@ -286,15 +283,15 @@ export default function Checkout() {
             <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', marginBottom: '8px', color: '#a0a0b0', fontSize: '0.9rem' }}>Pilih Kurir</label>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  {['jne', 'jnt', 'sicepat'].map(c => (
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  {['jne', 'jnt', 'sicepat', 'anteraja', 'pos'].map(c => (
                     <button
                       key={c} type="button"
                       onClick={() => setFormData(prev => ({ ...prev, courier: c }))}
                       style={{ 
-                        flex: 1, padding: '10px', borderRadius: '8px', border: formData.courier === c ? '1px solid #dc143c' : '1px solid #333',
+                        flex: '1 1 80px', padding: '10px', borderRadius: '8px', border: formData.courier === c ? '1px solid #dc143c' : '1px solid #333',
                         background: formData.courier === c ? 'rgba(220, 20, 60, 0.1)' : 'rgba(0,0,0,0.2)',
-                        color: formData.courier === c ? '#dc143c' : '#888', cursor: 'pointer', fontWeight: 'bold'
+                        color: formData.courier === c ? '#dc143c' : '#888', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.75rem'
                       }}
                     >
                       {c.toUpperCase()}
@@ -318,17 +315,18 @@ export default function Checkout() {
                       key={i} 
                       onClick={() => setSelectedOption(opt)}
                       style={{ 
-                        padding: '15px', borderRadius: '10px', border: selectedOption?.service === opt.service ? '1px solid #2ecc71' : '1px solid #333',
+                        padding: '15px', borderRadius: '10px',
+                        border: selectedOption?.serviceCode === opt.serviceCode && selectedOption?.courierCode === opt.courierCode ? '1px solid #2ecc71' : '1px solid #333',
                         background: 'rgba(255,255,255,0.02)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                       }}
                     >
                       <div>
-                        <div style={{ fontWeight: 'bold' }}>{opt.service} ({opt.description})</div>
-                        <div style={{ fontSize: '0.8rem', color: '#888' }}>Estimasi: {opt.etd} Hari</div>
+                        <div style={{ fontWeight: 'bold' }}>{opt.serviceName} <span style={{ color: '#888', fontWeight: 'normal', fontSize: '0.85rem' }}>({opt.courierName})</span></div>
+                        <div style={{ fontSize: '0.8rem', color: '#888', marginTop: '3px' }}>Estimasi: {opt.estimatedDay} hari kerja</div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontWeight: 'bold' }}>Rp {opt.cost.toLocaleString('id-ID')}</span>
-                        {selectedOption?.service === opt.service && <CheckCircle size={18} color="#2ecc71" />}
+                        <span style={{ fontWeight: 'bold' }}>Rp {opt.price.toLocaleString('id-ID')}</span>
+                        {selectedOption?.serviceCode === opt.serviceCode && selectedOption?.courierCode === opt.courierCode && <CheckCircle size={18} color="#2ecc71" />}
                       </div>
                     </div>
                   )) : (

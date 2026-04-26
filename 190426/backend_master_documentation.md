@@ -34,8 +34,9 @@ Sistem ini memisahkan logika ke dalam beberapa gerbang secara ketat agar kode ti
 | **`Product`** | Inventaris reguler. | Mencakup barang *read-made* seperti Manga, BluRay, Action Figure biasa. |
 | **`Discount`** | Kupon Potongan Harga. | Dapat berbasis Nilai Tetap (Rp) atau Persentase (%). Disambungkan di Service OrderCheckout. |
 | **`CustomOrder`** | Blueprint milik Pelanggan. | Menyimpan referensi URL lampiran gambar + JSON koordinat (*mockup x,y* canvas) desain 3D AF/Baju dari Web Frontend. |
-| **`Order`** | Keranjang & Transaksi Akhir. | Payung seluruh belanjaan pengguna. Mengkalkulasi `TotalAmount` lalu `FinalAmount` dari kumpulan item dan Diskon. |
+| **`Order`** | Keranjang & Transaksi Akhir. | Payung seluruh belanjaan pengguna. Mengkalkulasi `TotalAmount` lalu `FinalAmount` dari kumpulan item dan Diskon. Menyimpan data pengiriman (`CourierCode`, `TrackingNumber`). |
 | **`OrderItem`** | Detail Keranjang. | Menyambungkan struk dari `Order` secara bercabang ke **Product (Reguler)** ATAUPUN **CustomOrder (Kustom)**. |
+| **`OrderTracking`** | Riwayat Pelacakan. | Menyimpan log kronologis status pengiriman berdasarkan API pihak ketiga (BinderByte). |
 
 ---
 
@@ -62,6 +63,8 @@ Pemetaan izin rute bersandar penuh pada *Rules* di `SecurityConfig.java`:
   - `POST /api/v1/auth/register` (Registrasi Akun)
   - `GET /api/v1/products/**` (Lihat Etalase Barang)
   - `GET /api/v1/discounts/**` (Cek Kupon Tersedia)
+  - `GET /api/v1/shipping/**` (Cek Daftar Kota & Kalkulasi Ongkir via BinderByte)
+  - `GET /api/v1/tracking/**` (Lacak Status Resi Pengiriman)
 
 - **Akses Autentikasi (Membutuhkan JWT valid: Roles Admin/Customer)**
   - `POST /api/v1/orders` (Memproses Pemesanan Check-Out Keranjang)
@@ -71,4 +74,4 @@ Pemetaan izin rute bersandar penuh pada *Rules* di `SecurityConfig.java`:
 ## 🏁 6. Deployment Readiness
 Sistem terverifikasi siap untuk tahap *Staging/Production*. 
 - **Start-up Command**: Gunakan `mvnw spring-boot:run` (Lokal) atau bungkus proyek dan `java -jar target/ecommerce-backend-0.0.1-SNAPSHOT.jar` pada VM Server.
-- Agar keamanan optimal pada kluster industri, pastikan properti SQL (URI/Passwords) diatur di dalam System Environment Variables (`application.yml` via variabel dinamis, e.g. `${DB_HOST}`).
+- **Environment Variables**: Keamanan optimal pada kluster industri diwajibkan. Pastikan properti SQL (URI/Passwords), JWT Secret, dan API Keys (seperti `BINDERBYTE_API_KEY`) diatur melalui *System Environment Variables*. Gunakan file `.env.example` di root proyek sebagai *template* pedoman untuk tim DevOps.

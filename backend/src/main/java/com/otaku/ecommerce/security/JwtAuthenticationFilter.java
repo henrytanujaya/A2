@@ -7,7 +7,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -40,6 +42,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         final String authHeader = request.getHeader("Authorization");
+        log.info("[JWT-DEBUG] Incoming request: {} {}, Authorization: {}", request.getMethod(), request.getRequestURI(), authHeader != null ? "Present" : "MISSING");
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
@@ -73,8 +76,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String email = jwtUtil.extractEmail(jwt);
         String role  = jwtUtil.extractRole(jwt);
+        
+        Authentication existingAuth = SecurityContextHolder.getContext().getAuthentication();
+        log.info("[JWT-DEBUG] Extracted email: {}, role: {}, existingAuth: {}", email, role, existingAuth != null ? existingAuth.getClass().getSimpleName() : "null");
 
-        if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+        if (email != null) {
             SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + role);
             UsernamePasswordAuthenticationToken authToken =
                     new UsernamePasswordAuthenticationToken(email, null, Collections.singletonList(authority));
@@ -86,9 +92,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             
             // Set ke Holder
             SecurityContextHolder.setContext(context);
-            
-            // Simpan ke Session (agar terkirim ke Redis via Spring Session)
-            request.getSession().setAttribute("SPRING_SECURITY_CONTEXT", context);
+            log.info("[JWT-SUCCESS] Authentication set for user: {}", email);
         }
 
         filterChain.doFilter(request, response);

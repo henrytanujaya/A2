@@ -56,6 +56,21 @@ export default function AdminOrders() {
     }
   };
 
+  const handleValidatePayment = async (orderId) => {
+    try {
+      await axiosInstance.patch(`/api/v1/orders/${orderId}/status`, null, {
+        params: {
+          status: 'Processing'
+        }
+      });
+      showModal("Pembayaran berhasil divalidasi!", "success");
+      fetchOrders();
+    } catch (error) {
+      console.error("Validation error:", error);
+      showModal("Gagal memvalidasi pembayaran.", "error");
+    }
+  };
+
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
       order.orderId.toString().includes(searchTerm) ||
@@ -100,7 +115,7 @@ export default function AdminOrders() {
 
       {/* Admin Tabs */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '25px', borderBottom: '1px solid #333', paddingBottom: '15px' }}>
-        {['all', 'perlu_resi', 'Processing', 'Shipped', 'Completed', 'Cancelled'].map(tab => (
+        {['all', 'Waiting_Verification', 'perlu_resi', 'Processing', 'Shipped', 'Completed', 'Cancelled'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -116,7 +131,7 @@ export default function AdminOrders() {
               transition: 'all 0.2s'
             }}
           >
-            {tab === 'all' ? 'Semua' : tab === 'perlu_resi' ? 'Perlu Input Resi ⚠️' : tab.toUpperCase()}
+            {tab === 'all' ? 'Semua' : tab === 'Waiting_Verification' ? 'Validasi Pembayaran 💸' : tab === 'perlu_resi' ? 'Perlu Input Resi ⚠️' : tab.toUpperCase()}
           </button>
         ))}
       </div>
@@ -166,14 +181,29 @@ export default function AdminOrders() {
                         borderRadius: '4px', 
                         fontSize: '0.75rem', 
                         fontWeight: 'bold',
-                        background: order.status === 'Processing' ? 'rgba(52, 152, 219, 0.1)' : order.status === 'Shipped' ? 'rgba(155, 89, 182, 0.1)' : 'rgba(255,255,255,0.05)',
-                        color: order.status === 'Processing' ? '#3498db' : order.status === 'Shipped' ? '#9b59b6' : '#888'
+                        background: 
+                          order.status === 'Waiting_Verification' ? 'rgba(241, 196, 15, 0.1)' :
+                          order.status === 'Processing' ? 'rgba(52, 152, 219, 0.1)' : 
+                          order.status === 'Shipped' ? 'rgba(155, 89, 182, 0.1)' : 
+                          'rgba(255,255,255,0.05)',
+                        color: 
+                          order.status === 'Waiting_Verification' ? '#f1c40f' :
+                          order.status === 'Processing' ? '#3498db' : 
+                          order.status === 'Shipped' ? '#9b59b6' : 
+                          '#888'
                       }}>
-                        {order.status.toUpperCase()}
+                        {order.status === 'Waiting_Verification' ? 'WAITING VERIF' : order.status.toUpperCase()}
                       </span>
                     </td>
                     <td style={{ padding: '15px 20px' }}>
-                      {order.status === 'Processing' && !order.trackingNumber ? (
+                      {order.status === 'Waiting_Verification' ? (
+                        <button 
+                          onClick={() => handleValidatePayment(order.orderId)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 15px', background: '#2ecc71', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
+                        >
+                          <CheckCircle size={16} /> Validasi Pembayaran
+                        </button>
+                      ) : order.status === 'Processing' && !order.trackingNumber ? (
                         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                           <input 
                             type="text" 

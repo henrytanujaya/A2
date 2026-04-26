@@ -73,13 +73,13 @@ jwt:
   access-token-expiration: 900000      # 15 menit
   refresh-token-expiration: 604800000  # 7 hari
 
-# ─── File Storage (Local) ──────────────────────────────────────────────────
+# ─── File Storage (Local) ────────────────────────────────────────────────────
 storage:
   upload-dir: uploads
   outfit-dir: ${storage.upload-dir}/outfits
   figure-dir: ${storage.upload-dir}/figures
 
-# ─── BinderByte Tracking API ────────────────────────────────────────────────
+# ─── BinderByte Tracking API (untuk TrackingService) ────────────────────────
 binderbyte:
-  api-key: ce8138be2864572d8049d35839fe1cf66a26faf74a5859c96a0cd57d678c2c6d
+  api-key: ${BINDERBYTE_API_KEY:f3f50808a3d132b354dfa4ebf2c5d1752bca7e025f187a51206bd4199c4bd9cc}
   base-url: https://api.binderbyte.com/v1

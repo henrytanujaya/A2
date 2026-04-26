@@ -41,6 +41,13 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success("OTK-2021", "Riwayat order berhasil diambil", orders));
     }
 
+    @GetMapping("/all")
+    @PreAuthorize("hasRole('Admin')")
+    public ResponseEntity<ApiResponse<List<OrderResponseDTO>>> getAllOrders(Authentication authentication) {
+        List<OrderResponseDTO> orders = orderService.getAllOrders();
+        return ResponseEntity.ok(ApiResponse.success("OTK-2023", "Semua data order berhasil diambil", orders));
+    }
+
     // ─── Get Order by ID (dengan ownership check — IDOR protection) ──────────
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('Admin') or @orderSecurity.isOrderOwner(#id, authentication.name)")
@@ -48,17 +55,10 @@ public class OrderController {
         OrderResponseDTO response = orderService.getOrderById(id);
         return ResponseEntity.ok(ApiResponse.success("OTK-2022", "Detail order berhasil diambil", response));
     }
-    // ─── Get All Orders (Admin) ───────────────────────────────────────────────
-    @GetMapping("/all")
-    @PreAuthorize("hasRole('Admin')")
-    public ResponseEntity<ApiResponse<List<OrderResponseDTO>>> getAllOrders() {
-        List<OrderResponseDTO> orders = orderService.getAllOrders();
-        return ResponseEntity.ok(ApiResponse.success("OTK-2023", "Semua data order berhasil diambil", orders));
-    }
 
     // ─── Update Order Status & Tracking (Admin) ───────────────────────────────
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasRole('Admin')")
+    @PreAuthorize("hasRole('Admin') or (@orderSecurity.isOrderOwner(#id, authentication.name) and #status == 'Waiting_Verification')")
     public ResponseEntity<ApiResponse<Void>> updateStatus(
             @PathVariable Integer id,
             @RequestParam(required = false) String status,

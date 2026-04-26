@@ -22,6 +22,7 @@ public class OrderRequestDTO {
 
     private String shippingAddress;
     private String courierName;
+    private String courierCode;
 
     public List<OrderItemRequestDTO> getItems() { return items; }
     public void setItems(List<OrderItemRequestDTO> items) { this.items = items; }
@@ -31,4 +32,6 @@ public class OrderRequestDTO {
     public void setShippingAddress(String shippingAddress) { this.shippingAddress = shippingAddress; }
     public String getCourierName() { return courierName; }
     public void setCourierName(String courierName) { this.courierName = courierName; }
+    public String getCourierCode() { return courierCode; }
+    public void setCourierCode(String courierCode) { this.courierCode = courierCode; }
 }
