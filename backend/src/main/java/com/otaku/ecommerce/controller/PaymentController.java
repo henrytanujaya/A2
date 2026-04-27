@@ -5,6 +5,7 @@ import com.otaku.ecommerce.dto.PaymentRequestDTO;
 import com.otaku.ecommerce.dto.PaymentResponseDTO;
 import com.otaku.ecommerce.service.PaymentService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -28,18 +29,22 @@ public class PaymentController {
         return ResponseEntity.ok(ApiResponse.success("OTK-200", "Token pembayaran berhasil dibuat", response));
     }
 
-    // Mock Webhook Endpoint
-    @PostMapping("/webhook")
-    public ResponseEntity<ApiResponse<Void>> handleWebhook(@RequestBody Map<String, Object> payload) {
-        // Asumsi format payload dari mock gateway
-        String token = (String) payload.get("token");
-        String status = (String) payload.get("transaction_status");
-        Integer orderId = (Integer) payload.get("order_id");
+    @Value("${xendit.callback-token}")
+    private String xenditCallbackToken;
 
-        if (orderId != null && status != null) {
-            paymentService.processPaymentNotification(token, status, orderId);
+    // Xendit Webhook Endpoint
+    @PostMapping("/webhook")
+    public ResponseEntity<ApiResponse<Void>> handleWebhook(
+            @RequestHeader("x-callback-token") String callbackToken,
+            @RequestBody Map<String, Object> payload) {
+        
+        // Verifikasi token untuk keamanan
+        if (xenditCallbackToken == null || !xenditCallbackToken.equals(callbackToken)) {
+            return ResponseEntity.status(401).body(ApiResponse.error("OTK-401", "Unauthorized callback"));
         }
 
-        return ResponseEntity.ok(ApiResponse.success("OTK-200", "Webhook received", null));
+        paymentService.processXenditWebhook(payload);
+
+        return ResponseEntity.ok(ApiResponse.success("OTK-200", "Webhook received and processed", null));
     }
 }

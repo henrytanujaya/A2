@@ -53,6 +53,7 @@ public class CartService {
         }
     }
 
+    @SuppressWarnings("null")
     public void saveGuestCart(String guestId, List<CartItemDTO> cart) {
         String key = REDIS_CART_PREFIX + guestId;
         try {
@@ -106,6 +107,7 @@ public class CartService {
         redisTemplate.delete(REDIS_CART_PREFIX + guestId);
     }
 
+    @SuppressWarnings("null")
     private CartItemDTO buildVirtualCartItemDTO(CartRequestDTO request) {
         CartItemDTO dto = new CartItemDTO();
         dto.setQuantity(request.getQuantity());
@@ -125,7 +127,7 @@ public class CartService {
             dto.setCustomOrderId(customOrder.getId());
             dto.setName(customOrder.getServiceType() + " Custom");
             dto.setPrice(customOrder.getPrice() != null ? customOrder.getPrice() : java.math.BigDecimal.ZERO);
-            dto.setImageUrl(customOrder.getImageReferenceUrl());
+            dto.setImageUrl(customOrder.getPreviewImageUrl() != null ? customOrder.getPreviewImageUrl() : customOrder.getImageReferenceUrl());
             dto.setDetails("Custom order configuration");
         } else {
             throw new CustomBusinessException("OTK-4010", "Harus menyediakan ProductID atau CustomOrderID", 400);
@@ -142,6 +144,7 @@ public class CartService {
     }
 
     @Transactional
+    @SuppressWarnings("null")
     public void addUserCartItem(String email, CartRequestDTO request) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomBusinessException("OTK-4041", "User tidak ditemukan", 404));
@@ -181,7 +184,7 @@ public class CartService {
                 item.setCustomOrder(customOrder);
                 item.setName(customOrder.getServiceType() + " Custom");
                 item.setPrice(customOrder.getPrice() != null ? customOrder.getPrice() : java.math.BigDecimal.ZERO);
-                item.setImageUrl(customOrder.getImageReferenceUrl());
+                item.setImageUrl(customOrder.getPreviewImageUrl() != null ? customOrder.getPreviewImageUrl() : customOrder.getImageReferenceUrl());
                 item.setDetails("Custom order configuration");
             }
             cartItemRepository.save(item);
@@ -189,6 +192,7 @@ public class CartService {
     }
 
     @Transactional
+    @SuppressWarnings("null")
     public void updateUserCartItemQuantity(String email, Integer cartItemId, Integer quantity) {
         CartItem item = cartItemRepository.findById(cartItemId)
                 .orElseThrow(() -> new CustomBusinessException("OTK-404", "Item keranjang tidak ditemukan", 404));
@@ -207,6 +211,7 @@ public class CartService {
     }
 
     @Transactional
+    @SuppressWarnings("null")
     public void removeUserCartItem(String email, Integer cartItemId) {
         CartItem item = cartItemRepository.findById(cartItemId)
                 .orElseThrow(() -> new CustomBusinessException("OTK-404", "Item keranjang tidak ditemukan", 404));

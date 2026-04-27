@@ -71,6 +71,22 @@ export default function AdminOrders() {
     }
   };
 
+  const handleCancelOrder = async (orderId) => {
+    if (!window.confirm("Apakah Anda yakin ingin membatalkan pesanan ini?")) return;
+    try {
+      await axiosInstance.patch(`/api/v1/orders/${orderId}/status`, null, {
+        params: {
+          status: 'Cancelled'
+        }
+      });
+      showModal("Pesanan berhasil dibatalkan.", "success");
+      fetchOrders();
+    } catch (error) {
+      console.error("Cancel order error:", error);
+      showModal("Gagal membatalkan pesanan.", "error");
+    }
+  };
+
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
       order.orderId.toString().includes(searchTerm) ||
@@ -196,13 +212,22 @@ export default function AdminOrders() {
                       </span>
                     </td>
                     <td style={{ padding: '15px 20px' }}>
-                      {order.status === 'Waiting_Verification' ? (
-                        <button 
-                          onClick={() => handleValidatePayment(order.orderId)}
-                          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 15px', background: '#2ecc71', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
-                        >
-                          <CheckCircle size={16} /> Validasi Pembayaran
-                        </button>
+                      {(order.status === 'Waiting_Verification' || order.status === 'Pending') ? (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button 
+                            onClick={() => handleValidatePayment(order.orderId)}
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 15px', background: '#2ecc71', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
+                          >
+                            <CheckCircle size={16} /> {order.status === 'Pending' ? 'Simulasi Bayar (Dev)' : 'Validasi Pembayaran'}
+                          </button>
+                          <button 
+                            onClick={() => handleCancelOrder(order.orderId)}
+                            style={{ padding: '8px', background: 'rgba(220, 20, 60, 0.1)', color: '#dc143c', border: '1px solid #dc143c', borderRadius: '6px', cursor: 'pointer' }}
+                            title="Batalkan Pesanan"
+                          >
+                            Batal
+                          </button>
+                        </div>
                       ) : order.status === 'Processing' && !order.trackingNumber ? (
                         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                           <input 

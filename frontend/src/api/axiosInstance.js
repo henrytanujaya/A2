@@ -11,12 +11,16 @@ const axiosInstance = axios.create({
 // ─── Request Interceptor: Tambahkan JWT ke setiap request ─────────────────
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('accessToken');
+    // Gunakan adminAccessToken jika di halaman admin, jika tidak gunakan accessToken biasa
+    const isAdminPath = window.location.pathname.startsWith('/admin');
+    const tokenKey = isAdminPath ? 'adminAccessToken' : 'accessToken';
+    const token = localStorage.getItem(tokenKey);
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log(`[AXIOS-DEBUG] Token attached for ${config.url}`);
+      console.log(`[AXIOS-DEBUG] ${isAdminPath ? 'ADMIN' : 'USER'} Token attached for ${config.url}`);
     } else {
-      console.warn(`[AXIOS-DEBUG] NO TOKEN found for ${config.url}`);
+      console.warn(`[AXIOS-DEBUG] NO TOKEN found for ${config.url} (Checked: ${tokenKey})`);
     }
     return config;
   },
@@ -72,11 +76,15 @@ axiosInstance.interceptors.response.use(
     originalRequest._retry = true;
     isRefreshing = true;
 
-    const refreshToken = localStorage.getItem('refreshToken');
+    const isAdminPath = window.location.pathname.startsWith('/admin');
+    const refreshTokenKey = isAdminPath ? 'adminRefreshToken' : 'refreshToken';
+    const accessTokenKey = isAdminPath ? 'adminAccessToken' : 'accessToken';
+    
+    const refreshToken = localStorage.getItem(refreshTokenKey);
 
     if (!refreshToken) {
       // Tidak ada refresh token — force logout
-      handleForceLogout();
+      handleForceLogout(isAdminPath);
       return Promise.reject(error);
     }
 
@@ -87,8 +95,8 @@ axiosInstance.interceptors.response.use(
 
       if (response.data.success) {
         const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', newRefreshToken);
+        localStorage.setItem(accessTokenKey, accessToken);
+        localStorage.setItem(refreshTokenKey, newRefreshToken);
 
         processQueue(null, accessToken);
 
@@ -96,12 +104,12 @@ axiosInstance.interceptors.response.use(
         return axiosInstance(originalRequest);
       } else {
         processQueue(new Error('Refresh failed'), null);
-        handleForceLogout();
+        handleForceLogout(isAdminPath);
         return Promise.reject(error);
       }
     } catch (refreshError) {
       processQueue(refreshError, null);
-      handleForceLogout();
+      handleForceLogout(isAdminPath);
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;
@@ -112,10 +120,16 @@ axiosInstance.interceptors.response.use(
 /**
  * Force logout — hapus semua token dan redirect ke login.
  */
-function handleForceLogout() {
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
-  localStorage.removeItem('userData');
+function handleForceLogout(isAdmin = false) {
+  if (isAdmin) {
+    localStorage.removeItem('adminAccessToken');
+    localStorage.removeItem('adminRefreshToken');
+    localStorage.removeItem('adminUserData');
+  } else {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userData');
+  }
 
   // Redirect ke login jika belum di halaman login
   if (window.location.pathname !== '/login') {

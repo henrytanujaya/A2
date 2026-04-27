@@ -16,6 +16,9 @@ public class OrderResponseDTO {
     private String courierName;
     private String courierCode;
     private String trackingNumber;
+    private String paymentUrl;
+    private String paymentInvoiceId;
+    private List<OrderItemResponseDTO> items;
     private List<OrderTrackingDTO> trackingHistory;
 
     public Integer getOrderId() { return orderId; }
@@ -40,6 +43,12 @@ public class OrderResponseDTO {
     public void setCourierCode(String courierCode) { this.courierCode = courierCode; }
     public String getTrackingNumber() { return trackingNumber; }
     public void setTrackingNumber(String trackingNumber) { this.trackingNumber = trackingNumber; }
+    public String getPaymentUrl() { return paymentUrl; }
+    public void setPaymentUrl(String paymentUrl) { this.paymentUrl = paymentUrl; }
+    public String getPaymentInvoiceId() { return paymentInvoiceId; }
+    public void setPaymentInvoiceId(String paymentInvoiceId) { this.paymentInvoiceId = paymentInvoiceId; }
+    public List<OrderItemResponseDTO> getItems() { return items; }
+    public void setItems(List<OrderItemResponseDTO> items) { this.items = items; }
     public List<OrderTrackingDTO> getTrackingHistory() { return trackingHistory; }
     public void setTrackingHistory(List<OrderTrackingDTO> trackingHistory) { this.trackingHistory = trackingHistory; }
 }

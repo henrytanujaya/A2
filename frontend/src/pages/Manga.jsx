@@ -23,6 +23,12 @@ export default function Manga() {
   const [activeGenre, setActiveGenre] = useState('All');
   const [maxPrice, setMaxPrice] = useState(Infinity);
   const [searchQuery, setSearchQuery] = useState('');
+  const [quantities, setQuantities] = useState({});
+
+  const handleQtyChange = (id, val, max) => {
+    const qty = Math.max(1, Math.min(max, parseInt(val) || 1));
+    setQuantities(prev => ({ ...prev, [id]: qty }));
+  };
 
   const genres = ['All', 'Dark Fantasy', 'Isekai', 'Action'];
 
@@ -105,7 +111,12 @@ export default function Manga() {
                 {product.category}
               </span>
               <h3 className="product-title" style={{ fontSize: '16px', marginTop: '4px' }}>{product.name}</h3>
-              <p className="product-price">Rp {product.price.toLocaleString('id-ID')}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <p className="product-price" style={{ margin: 0 }}>Rp {product.price.toLocaleString('id-ID')}</p>
+                <span style={{ fontSize: '11px', color: product.stockQuantity > 20 ? '#2ecc71' : '#e67e22', background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: '4px' }}>
+                  Stok: {product.stockQuantity}
+                </span>
+              </div>
               
               <div style={{ display: 'flex', gap: '2px', marginBottom: '15px', color: '#f59e0b' }}>
                 {[...Array(product.rating || 5)].map((_, i) => (
@@ -113,20 +124,40 @@ export default function Manga() {
                 ))}
               </div>
 
-              <button 
-                onClick={() => addToCart({
-                  productId: product.id,
-                  name: product.name,
-                  price: product.price,
-                  imageUrl: product.imageUrl,
-                  details: `Kategori: ${product.category}`,
-                  quantity: 1
-                })}
-                className="add-to-cart-btn" 
-                style={{ marginTop: 'auto' }}
-              >
-                Add to Cart
-              </button>
+              <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+                <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', border: '1px solid #333' }}>
+                  <button 
+                    onClick={() => handleQtyChange(product.id, (quantities[product.id] || 1) - 1, product.stockQuantity)}
+                    style={{ padding: '4px 8px', background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}
+                  >-</button>
+                  <input 
+                    type="number" 
+                    value={quantities[product.id] || 1}
+                    onChange={(e) => handleQtyChange(product.id, e.target.value, product.stockQuantity)}
+                    style={{ width: '30px', textAlign: 'center', background: 'none', border: 'none', color: '#fff', fontSize: '0.8rem' }}
+                  />
+                  <button 
+                    onClick={() => handleQtyChange(product.id, (quantities[product.id] || 1) + 1, product.stockQuantity)}
+                    style={{ padding: '4px 8px', background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}
+                  >+</button>
+                </div>
+
+                <button 
+                  onClick={() => addToCart({
+                    productId: product.id,
+                    name: product.name,
+                    price: product.price,
+                    imageUrl: product.imageUrl,
+                    details: `Kategori: ${product.category}`,
+                    quantity: quantities[product.id] || 1
+                  })}
+                  className="add-to-cart-btn" 
+                  style={{ flex: 1, padding: '8px' }}
+                  disabled={product.stockQuantity <= 0}
+                >
+                  {product.stockQuantity <= 0 ? 'Habis' : 'Add to Cart'}
+                </button>
+              </div>
             </div>
           </motion.div>
         ))}

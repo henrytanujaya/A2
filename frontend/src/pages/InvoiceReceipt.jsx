@@ -34,23 +34,28 @@ export default function InvoiceReceipt() {
               orderId: order.orderId,
               invoiceId: `INV-${order.orderId}`,
               date: new Date(order.createdAt).toLocaleString('id-ID'),
-              status: order.status === 'Pending' ? 'UNPAID' : 
-                      order.status === 'Waiting_Verification' ? 'WAITING' : 'LUNAS',
-              paymentMethod: (order.status === 'Pending' || order.status === 'Waiting_Verification') ? '-' : 'Transfer',
+              status: (order.status === 'Processing' || order.status === 'Shipped' || order.status === 'Completed' || order.status === 'Paid') ? 'LUNAS' : 
+                      order.status === 'Waiting_Verification' ? 'WAITING' : 'UNPAID',
+              paymentMethod: (order.status === 'Pending' || order.status === 'Waiting_Verification') ? '-' : 'Xendit',
+              paymentUrl: order.paymentUrl,
               courier: order.courierName,
               courierCode: order.courierCode,
               trackingNumber: order.trackingNumber,
               customer: {
-                name: order.shippingAddress.split('\n')[0] || 'User', // Simple fallback
+                name: order.shippingAddress.split('\n')[0] || 'User',
                 email: '-',
                 address: order.shippingAddress
               },
-              items: order.trackingHistory.length > 0 ? [] : [], // We might need more item details here, but for now we focus on status
+              items: (order.items || []).map(item => ({
+                name: item.productName,
+                details: `Qty: ${item.quantity} x Rp ${item.unitPrice.toLocaleString('id-ID')}`,
+                price: item.totalPrice
+              })),
               summary: {
                 subtotal: order.totalAmount,
-                discount: order.totalAmount.subtract ? 0 : 0, // Placeholder
-                shipping: 25000,
-                ppn: order.totalAmount * 0.11,
+                discount: order.discountCode ? (order.totalAmount - order.finalAmount + 25000) : 0, // Estimasi diskon
+                shipping: 25000, // Idealnya ini juga dari backend
+                ppn: (order.finalAmount - 25000) * 0.11, // Estimasi PPN
                 total: order.finalAmount
               }
             };
@@ -64,7 +69,38 @@ export default function InvoiceReceipt() {
       }
     };
     fetchInvoiceDetails();
-  }, [paramOrderId, invoice]);
+    
+    // Auto-polling jika status masih UNPAID atau WAITING
+    let pollInterval;
+    if (invoice && (invoice.status === 'UNPAID' || invoice.status === 'WAITING')) {
+      pollInterval = setInterval(async () => {
+        console.log("[POLLING] Checking order status...");
+        
+        // Simpan status lama
+        const oldStatus = invoice.status;
+        
+        // Ambil data terbaru
+        const res = await axiosInstance.get(`/api/v1/orders/${paramOrderId}`);
+        if (res.data.success) {
+          const newOrder = res.data.data;
+          const newStatus = (newOrder.status === 'Processing' || newOrder.status === 'Shipped' || newOrder.status === 'Completed' || newOrder.status === 'Paid') ? 'LUNAS' : 
+                          newOrder.status === 'Waiting_Verification' ? 'WAITING' : 'UNPAID';
+          
+          // Jika status berubah, beri jeda 1 detik sebelum update UI
+          if (newStatus !== oldStatus) {
+            console.log("[POLLING] Status changed! Waiting 1s...");
+            setTimeout(() => {
+              fetchInvoiceDetails();
+            }, 1000);
+          }
+        }
+      }, 5000); // Cek setiap 5 detik
+    }
+
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [paramOrderId, invoice?.status]);
 
   useEffect(() => {
     if (invoice?.status === 'LUNAS' && invoice?.trackingNumber && !trackingData) {
@@ -87,22 +123,11 @@ export default function InvoiceReceipt() {
     window.print();
   };
 
-  const handlePayment = async () => {
-    try {
-      // 1. Sync with backend - Update status to Waiting_Verification
-      await axiosInstance.patch(`/api/v1/orders/${invoice.orderId}/status`, null, {
-        params: {
-          status: 'Waiting_Verification'
-        }
-      });
-
-      showModal(`Pembayaran sebesar Rp ${invoice.summary.total.toLocaleString('id-ID')} menggunakan ${paymentMethod} berhasil dikirim! Mohon tunggu verifikasi Admin.`, 'success', () => {
-        setInvoice(prev => ({ ...prev, status: 'WAITING', paymentMethod }));
-        clearCart();
-      });
-    } catch (error) {
-      console.error("Payment sync error:", error);
-      showModal("Gagal sinkronisasi pembayaran ke server.", "error");
+  const handlePayment = () => {
+    if (invoice.paymentUrl) {
+      window.location.href = invoice.paymentUrl;
+    } else {
+      showModal("Link pembayaran tidak ditemukan. Silakan hubungi admin.", "error");
     }
   };
 
@@ -321,19 +346,15 @@ export default function InvoiceReceipt() {
       <div className="no-print" style={{ width: '100%', maxWidth: '600px', marginTop: '20px' }}>
         {!isPaid && !isWaiting ? (
           <div style={{ background: 'var(--card-bg)', padding: '25px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <h3 style={{ marginBottom: '15px', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}><CreditCard size={20} color="#dc143c" /> Pilih Metode Pembayaran</h3>
-            <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid #444', color: '#fff', borderRadius: '8px', marginBottom: '20px' }}>
-              <option value="QRIS">QRIS</option>
-              <option value="BCA">Transfer BCA</option>
-              <option value="MANDIRI">Transfer Mandiri</option>
-              <option value="GOPAY">GoPay</option>
-            </select>
+            <p style={{ color: '#a0a0b0', fontSize: '0.9rem', marginBottom: '15px' }}>
+              Anda akan diarahkan ke halaman pembayaran aman <strong>Xendit</strong>. Mendukung Virtual Account, E-Wallet, QRIS, dan Gerai Retail.
+            </p>
             <button 
               onClick={handlePayment}
               className="nav-btn primary"
-              style={{ width: '100%', padding: '15px', fontSize: '1.1rem', border: 'none', cursor: 'pointer', borderRadius: '8px', fontWeight: 'bold' }}
+              style={{ width: '100%', padding: '15px', fontSize: '1.1rem', border: 'none', cursor: 'pointer', borderRadius: '8px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
             >
-              Bayar Sekarang
+              <CreditCard size={20} /> Bayar Sekarang (Xendit)
             </button>
           </div>
         ) : (

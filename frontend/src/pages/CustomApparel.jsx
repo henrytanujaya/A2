@@ -6,6 +6,7 @@ import { removeBackground } from '@imgly/background-removal';
 import { Loader2 } from 'lucide-react';
 import { useModal } from '../contexts/ModalContext';
 import axiosInstance from '../api/axiosInstance';
+import html2canvas from 'html2canvas';
 
 import bajuHitamDepan from '../assets/baju_hitam_depan.jpg';
 import bajuHitamBelakang from '../assets/baju_hitam_belakang.jpg';
@@ -47,6 +48,12 @@ export default function CustomApparel() {
   // RND state
   const [frontRnd, setFrontRnd] = useState({ x: 50, y: 50, width: 100, height: 100 });
   const [backRnd, setBackRnd] = useState({ x: 50, y: 50, width: 100, height: 100 });
+  const [quantity, setQuantity] = useState(1);
+
+  const handleQtyChange = (val) => {
+    const qty = Math.max(1, parseInt(val) || 1);
+    setQuantity(qty);
+  };
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
@@ -113,23 +120,44 @@ export default function CustomApparel() {
 
     setIsProcessing(true);
     try {
-      let uploadedImageUrl = null;
-      const targetBlob = frontBlob || backBlob;
+      // 1. Capture Mockup Preview
+      const mockupElement = document.getElementById('mockup-studio');
+      const canvas = await html2canvas(mockupElement, {
+        useCORS: true,
+        backgroundColor: '#111',
+        scale: 2 // Higher quality
+      });
+      
+      const previewBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
 
-      // 1. Upload ke Cloudinary jika ada gambar
+      // 2. Upload both to Cloudinary
+      let uploadedImageUrl = null;
+      let previewImageUrl = null;
+
+      // Upload Preview
+      const previewFormData = new FormData();
+      previewFormData.append('file', previewBlob, 'preview.jpg');
+      const previewRes = await axiosInstance.post('/api/v1/upload/outfit-reference', previewFormData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      previewImageUrl = previewRes.data.data.imageUrl;
+
+      // Upload Original Asset (if any)
+      const targetBlob = frontBlob || backBlob;
       if (targetBlob) {
-        const formData = new FormData();
-        formData.append('file', targetBlob);
-        const uploadRes = await axiosInstance.post('/api/v1/upload/outfit-reference', formData, {
+        const assetFormData = new FormData();
+        assetFormData.append('file', targetBlob);
+        const assetRes = await axiosInstance.post('/api/v1/upload/outfit-reference', assetFormData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
-        uploadedImageUrl = uploadRes.data.data.imageUrl;
+        uploadedImageUrl = assetRes.data.data.imageUrl;
       }
 
-      // 2. Simpan sebagai Custom Order di Database
+      // 3. Simpan sebagai Custom Order di Database
       const customOrderReq = {
         serviceType: `Apparel: ${apparel}`,
         imageReferenceUrl: uploadedImageUrl,
+        previewImageUrl: previewImageUrl,
         price: calculateTotal(),
         configurationJson: JSON.stringify({
           apparel, color, size,
@@ -142,15 +170,17 @@ export default function CustomApparel() {
       const customOrderRes = await axiosInstance.post('/api/v1/custom-orders', customOrderReq);
       const customOrderId = customOrderRes.data.data.id;
 
-      // 3. Masukkan ke Keranjang
+      // 4. Masukkan ke Keranjang
       await addToCart({
         customOrderId: customOrderId,
         name: `Custom ${apparel === 'tshirt' ? 'T-Shirt' : 'Jacket'}`,
         price: calculateTotal(),
-        image: uploadedImageUrl || MOCKUPS[apparel][color]['front'],
+        image: previewImageUrl, // Use preview image for cart
         details: `Warna: ${color}\nUkuran: ${size}\nCetak Depan: ${frontImage ? 'Ya' : 'Tidak'}\nCetak Belakang: ${backImage ? 'Ya' : 'Tidak'}`,
-        quantity: 1
+        quantity: quantity
       });
+
+      showModal("Desain berhasil dimasukkan ke keranjang!", "success");
 
     } catch (error) {
       console.error("Gagal memproses custom order:", error);
@@ -266,7 +296,7 @@ export default function CustomApparel() {
         {/* Mockup Area */}
         <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           
-          <div style={{ position: 'relative', width: '100%', maxWidth: '500px', aspectRatio: '4/5', background: '#111', borderRadius: '15px', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div id="mockup-studio" style={{ position: 'relative', width: '100%', maxWidth: '500px', aspectRatio: '4/5', background: '#111', borderRadius: '15px', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             {/* Base Image */}
             <AnimatePresence mode="wait">
               <motion.img 
@@ -357,9 +387,27 @@ export default function CustomApparel() {
               <p>- Cetak Belakang: {backImage ? `Rp ${PRINT_PRICE_PER_SIDE.toLocaleString('id-ID')}` : '-'}</p>
               <p>- Ukuran: {size}</p>
             </div>
-            <button onClick={handleAddToCart} className="add-to-cart-btn" style={{ width: '100%', padding: '15px', fontSize: '16px' }}>
-              Masukkan Keranjang
-            </button>
+            <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid #333' }}>
+                <button 
+                  onClick={() => handleQtyChange(quantity - 1)}
+                  style={{ padding: '10px 15px', background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '1.2rem' }}
+                >-</button>
+                <input 
+                  type="number" 
+                  value={quantity}
+                  onChange={(e) => handleQtyChange(e.target.value)}
+                  style={{ width: '50px', textAlign: 'center', background: 'none', border: 'none', color: '#fff', fontSize: '1.1rem', fontWeight: 'bold' }}
+                />
+                <button 
+                  onClick={() => handleQtyChange(quantity + 1)}
+                  style={{ padding: '10px 15px', background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '1.2rem' }}
+                >+</button>
+              </div>
+              <button onClick={handleAddToCart} className="add-to-cart-btn" style={{ flex: 1, padding: '15px', fontSize: '16px', margin: 0 }}>
+                Masukkan Keranjang
+              </button>
+            </div>
           </div>
 
         </div>

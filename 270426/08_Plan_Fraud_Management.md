@@ -41,7 +41,7 @@ Mencegah kerugian finansial akibat transaksi ilegal, menjaga integritas data sta
 ---
 
 ## 4. Apa yang Dibutuhkan untuk Menjalankan Rencana Ini
-1. **Xendit Callback Token**: Didapatkan dari dashboard Xendit (Settings -> Callback).
+1. **Xendit Callback Token**: Sudah tersedia (`TakCix3A3...`).
 2. **Database Table `payment_logs`**: Untuk menyimpan riwayat transaksi dan payload asli untuk keperluan audit.
 3. **SSL/HTTPS**: Wajib diaktifkan agar token webhook tidak bisa di-intercept di tengah jalan.
 4. **Environment Variable**: `XENDIT_CALLBACK_TOKEN` yang disimpan secara aman (bukan hardcoded).

@@ -9,8 +9,16 @@ export default function Merchandise() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [quantities, setQuantities] = useState({});
+
+  const handleQtyChange = (id, val, max) => {
+    const qty = Math.max(1, Math.min(max, parseInt(val) || 1));
+    setQuantities(prev => ({ ...prev, [id]: qty }));
+  };
+
   useEffect(() => {
     const fetchMerch = async () => {
+// ... existing fetchMerch logic ...
       try {
         const response = await axiosInstance.get('/api/v1/products');
         if (response.data.success) {
@@ -71,21 +79,47 @@ export default function Merchandise() {
                   </p>
 
                   <div style={{ marginTop: 'auto' }}>
-                    <p className="product-price" style={{ fontSize: '14px', marginBottom: '10px' }}>Harga: Rp {pkg.price.toLocaleString('id-ID')}</p>
-                    <button 
-                      onClick={() => addToCart({
-                        productId: pkg.id,
-                        name: pkg.name,
-                        price: pkg.price,
-                        imageUrl: pkg.imageUrl,
-                        details: `Kategori: ${pkg.category}`,
-                        quantity: 1
-                      })}
-                      className="add-to-cart-btn" 
-                      style={{ width: '100%' }}
-                    >
-                      Pesan Sekarang
-                    </button>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                      <p className="product-price" style={{ fontSize: '16px', margin: 0 }}>Rp {pkg.price.toLocaleString('id-ID')}</p>
+                      <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px', color: '#888' }}>
+                        Stok: <span style={{ color: pkg.stockQuantity > 5 ? '#2ecc71' : '#e67e22' }}>{pkg.stockQuantity}</span>
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid #333' }}>
+                        <button 
+                          onClick={() => handleQtyChange(pkg.id, (quantities[pkg.id] || 1) - 1, pkg.stockQuantity)}
+                          style={{ padding: '8px 12px', background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}
+                        >-</button>
+                        <input 
+                          type="number" 
+                          value={quantities[pkg.id] || 1}
+                          onChange={(e) => handleQtyChange(pkg.id, e.target.value, pkg.stockQuantity)}
+                          style={{ width: '40px', textAlign: 'center', background: 'none', border: 'none', color: '#fff', fontSize: '0.9rem' }}
+                        />
+                        <button 
+                          onClick={() => handleQtyChange(pkg.id, (quantities[pkg.id] || 1) + 1, pkg.stockQuantity)}
+                          style={{ padding: '8px 12px', background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}
+                        >+</button>
+                      </div>
+
+                      <button 
+                        onClick={() => addToCart({
+                          productId: pkg.id,
+                          name: pkg.name,
+                          price: pkg.price,
+                          imageUrl: pkg.imageUrl,
+                          details: `Kategori: ${pkg.category}`,
+                          quantity: quantities[pkg.id] || 1
+                        })}
+                        className="add-to-cart-btn" 
+                        style={{ flex: 1 }}
+                        disabled={pkg.stockQuantity <= 0}
+                      >
+                        {pkg.stockQuantity <= 0 ? 'Stok Habis' : 'Pesan Sekarang'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </motion.div>

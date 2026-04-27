@@ -32,7 +32,7 @@ Agar admin dapat melihat hasil desain akhir yang diinginkan pelanggan secara vis
 
 ## 4. Apa yang Dibutuhkan untuk Menjalankan Rencana Ini
 1. **Library `html2canvas`**: Tambahkan via npm/yarn di proyek frontend.
-2. **Cloudinary Setup**: Pastikan unsigned/signed upload preset sudah benar untuk folder `apparel-designs`.
+2. **Cloudinary Setup**: Pastikan upload preset `otaku_ecommerce` sudah benar untuk folder `otaku/apparel-designs`.
 3. **Database Update**: Migrasi field baru `preview_image_url` pada tabel `CustomOrders`.
 4. **CSS Adjustment**: Pastikan area mockup memiliki ID/Class yang unik agar mudah di-capture tanpa elemen UI yang tidak perlu (seperti button zoom).
 

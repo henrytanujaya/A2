@@ -6,20 +6,50 @@ import com.otaku.ecommerce.entity.Order;
 import com.otaku.ecommerce.exception.CustomBusinessException;
 import com.otaku.ecommerce.repository.OrderRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
-import java.util.UUID;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.otaku.ecommerce.entity.PaymentLog;
+import com.otaku.ecommerce.repository.PaymentLogRepository;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class PaymentService {
+
+    @Value("${xendit.secret-key}")
+    private String xenditSecretKey;
 
     @Autowired
     private OrderRepository orderRepository;
 
     @Autowired
+    private PaymentLogRepository paymentLogRepository;
+
+    @Autowired
     private OrderService orderService;
 
+    @Autowired
+    private RestTemplate restTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @SuppressWarnings({ "unchecked", "null" })
     public PaymentResponseDTO createPaymentToken(String userEmail, PaymentRequestDTO request) {
+        if (request.getOrderId() == null) {
+            throw new CustomBusinessException("OTK-400", "Order ID wajib diisi", 400);
+        }
+
         Order order = orderRepository.findById(request.getOrderId())
                 .orElseThrow(() -> new CustomBusinessException("OTK-4042", "Order tidak ditemukan", 404));
 
@@ -27,31 +57,117 @@ public class PaymentService {
             throw new CustomBusinessException("OTK-403", "Akses ditolak", 403);
         }
 
-        if (!"Pending".equalsIgnoreCase(order.getStatus()) && !"UNPAID".equalsIgnoreCase(order.getStatus())) {
-            throw new CustomBusinessException("OTK-400", "Order tidak valid untuk pembayaran", 400);
+        // Jika sudah ada invoice valid, kembalikan yang lama
+        if (order.getPaymentUrl() != null && "UNPAID".equals(order.getPaymentStatus())) {
+            PaymentResponseDTO response = new PaymentResponseDTO();
+            @SuppressWarnings("null")
+            String invoiceId = order.getPaymentInvoiceId();
+            response.setToken(invoiceId);
+            response.setPaymentUrl(order.getPaymentUrl());
+            return response;
         }
 
-        // Mock payment token generation (e.g., Midtrans Snap Token)
-        String token = UUID.randomUUID().toString();
-        
-        PaymentResponseDTO response = new PaymentResponseDTO();
-        response.setToken(token);
-        response.setPaymentUrl("https://mock-payment-gateway.com/checkout/" + token);
+        try {
+            String url = "https://api.xendit.co/v2/invoices";
 
-        return response;
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            String auth = xenditSecretKey + ":";
+            String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+            headers.set("Authorization", "Basic " + encodedAuth);
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("external_id", "ORDER-" + order.getId());
+            body.put("amount", order.getFinalAmount());
+            body.put("payer_email", order.getUser().getEmail());
+            body.put("description", "Pembayaran Otaku E-Commerce Order #" + order.getId());
+            
+            // Tambahkan URL redirect
+            body.put("success_redirect_url", "http://localhost:5173/my-orders");
+            body.put("failure_redirect_url", "http://localhost:5173/my-orders");
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+            Map<String, Object> xenditRes = restTemplate.postForObject(url, entity, Map.class);
+
+            if (xenditRes != null && xenditRes.containsKey("invoice_url")) {
+                String invoiceId = String.valueOf(xenditRes.get("id"));
+                String invoiceUrl = String.valueOf(xenditRes.get("invoice_url"));
+
+                order.setPaymentInvoiceId(invoiceId);
+                order.setPaymentUrl(invoiceUrl);
+                order.setPaymentStatus("UNPAID");
+                orderRepository.save(order);
+
+                PaymentResponseDTO response = new PaymentResponseDTO();
+                response.setToken(invoiceId);
+                response.setPaymentUrl(invoiceUrl);
+                return response;
+            } else {
+                throw new RuntimeException("Gagal membuat invoice di Xendit");
+            }
+        } catch (Exception e) {
+            throw new CustomBusinessException("OTK-500", "Gagal memproses pembayaran: " + e.getMessage(), 500);
+        }
     }
 
-    // Dipanggil oleh webhook / notifikasi dari payment gateway
-    public void processPaymentNotification(String token, String transactionStatus, Integer orderId) {
+    @Transactional
+    public void processXenditWebhook(Map<String, Object> payload) {
+        String externalId = String.valueOf(payload.get("external_id"));
+        String status = String.valueOf(payload.get("status"));
+        BigDecimal amountPaid = new BigDecimal(String.valueOf(payload.get("amount")));
+        
+        // externalId format: "ORDER-123"
+        Integer orderId = Integer.parseInt(externalId.replace("ORDER-", ""));
+        
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new CustomBusinessException("OTK-4042", "Order tidak ditemukan", 404));
 
-        if ("settlement".equalsIgnoreCase(transactionStatus) || "capture".equalsIgnoreCase(transactionStatus)) {
-            orderService.updateOrderStatus(orderId, "Paid");
-            orderService.addTrackingHistory(orderId, "Paid", "Pembayaran berhasil dikonfirmasi via Payment Gateway");
-        } else if ("cancel".equalsIgnoreCase(transactionStatus) || "expire".equalsIgnoreCase(transactionStatus)) {
-            orderService.updateOrderStatus(orderId, "Cancelled");
-            orderService.addTrackingHistory(orderId, "Cancelled", "Pembayaran gagal atau kedaluwarsa");
+        // 1. Audit Logging
+        try {
+            PaymentLog logEntry = new PaymentLog();
+            logEntry.setOrder(order);
+            logEntry.setExternalId(externalId);
+            logEntry.setStatus(status);
+            logEntry.setAmount(amountPaid);
+            logEntry.setRawPayload(objectMapper.writeValueAsString(payload));
+            paymentLogRepository.save(logEntry);
+        } catch (Exception e) {
+            // Log error silently agar tidak membatalkan update status
+            System.err.println("Gagal menyimpan payment log: " + e.getMessage());
         }
+
+        // 2. Fraud Check: Amount Validation
+        if (amountPaid.compareTo(order.getFinalAmount()) != 0) {
+             throw new CustomBusinessException("OTK-FRAUD", "Nominal pembayaran tidak sesuai!", 400);
+        }
+
+        // 3. Update Status
+        if ("PAID".equalsIgnoreCase(status) || "SETTLED".equalsIgnoreCase(status)) {
+            // Idempotency check
+            if (!"Shipped".equalsIgnoreCase(order.getStatus()) && !"Completed".equalsIgnoreCase(order.getStatus()) && !"STOCK_CONFLICT".equalsIgnoreCase(order.getStatus())) {
+                order.setPaymentStatus("PAID");
+                orderRepository.save(order);
+                
+                // Cek Stok dan Kurangi secara atomik
+                boolean stockReduced = orderService.validateAndReduceStock(orderId);
+                
+                if (stockReduced) {
+                    // Berhasil kurangi stok -> Lanjut ke Menunggu Konfirmasi
+                    orderService.updateOrderStatus(orderId, "Waiting_Verification");
+                    orderService.addTrackingHistory(orderId, "Waiting_Verification", "Pembayaran terverifikasi & stok aman.");
+                } else {
+                    // GAGAL kurangi stok (Konflik) -> Set status khusus
+                    order.setStatus("STOCK_CONFLICT");
+                    orderRepository.save(order);
+                    orderService.addTrackingHistory(orderId, "STOCK_CONFLICT", "PERINGATAN: Pembayaran diterima namun stok tidak mencukupi saat proses verifikasi.");
+                }
+            }
+        } else if ("EXPIRED".equalsIgnoreCase(status)) {
+            order.setPaymentStatus("EXPIRED");
+            orderService.updateOrderStatus(orderId, "Cancelled");
+            orderService.addTrackingHistory(orderId, "Cancelled", "Invoice Xendit kedaluwarsa");
+        }
+        
+        orderRepository.save(order);
     }
 }

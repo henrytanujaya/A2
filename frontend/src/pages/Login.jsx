@@ -31,13 +31,18 @@ export default function Login({ setIsLoggedIn }) {
 
       if (response.data.success) {
         const { accessToken, refreshToken, user } = response.data.data;
-
-        // Simpan token untuk integrasi API selanjutnya
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', refreshToken);
-        localStorage.setItem('userData', JSON.stringify(user));
-
         const isAdmin = user?.role === 'Admin';
+
+        if (isAdmin) {
+          localStorage.setItem('adminAccessToken', accessToken);
+          localStorage.setItem('adminRefreshToken', refreshToken);
+          localStorage.setItem('adminUserData', JSON.stringify(user));
+        } else {
+          localStorage.setItem('accessToken', accessToken);
+          localStorage.setItem('refreshToken', refreshToken);
+          localStorage.setItem('userData', JSON.stringify(user));
+        }
+
         const destination = isAdmin ? '/admin' : '/';
         const welcomeMsg = isAdmin
           ? "Login Admin Berhasil! Selamat datang di Panel Admin."

@@ -51,6 +51,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/", "/error", "/uploads/**").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
+                        .requestMatchers("/api/v1/payments/webhook").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/discounts/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/shipping/**").permitAll()
@@ -69,12 +70,22 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/orders/all").hasRole("Admin")
                         .requestMatchers("/api/v1/orders/**").hasAnyRole("Customer", "Admin")
                         .requestMatchers("/api/v1/custom-orders/**").hasAnyRole("Customer", "Admin")
+                        .requestMatchers("/api/v1/tripo/**").hasAnyRole("Customer", "Admin")
                         .requestMatchers("/api/v1/upload/**").hasAnyRole("Customer", "Admin")
                         .requestMatchers("/api/v1/tracking/**").hasAnyRole("Customer", "Admin")
                         // ─── Semua yang lain wajib auth ───────────────────────
                         .anyRequest().authenticated())
                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp
+                                .policyDirectives("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://res.cloudinary.com; connect-src 'self' https://api.xendit.co https://api.binderbyte.com https://api.tripo3d.ai;")
+                        )
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .maxAgeInSeconds(31536000)
+                        )
+                );
 
         return http.build();
     }

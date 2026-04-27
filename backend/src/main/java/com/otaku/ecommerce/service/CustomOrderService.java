@@ -37,6 +37,7 @@ public class CustomOrderService {
         customOrder.setServiceType(request.getServiceType());
         customOrder.setImageReferenceUrl(request.getImageReferenceUrl());
         customOrder.setConfigurationJson(request.getConfigurationJson());
+        customOrder.setPreviewImageUrl(request.getPreviewImageUrl());
         
         // Otomatis jadi Quoted jika harga dikirim (agar bisa langsung dibayar)
         if (request.getPrice() != null) {
@@ -99,6 +100,7 @@ public class CustomOrderService {
         dto.setServiceType(co.getServiceType());
         dto.setImageReferenceUrl(co.getImageReferenceUrl());
         dto.setConfigurationJson(co.getConfigurationJson());
+        dto.setPreviewImageUrl(co.getPreviewImageUrl());
         dto.setPrice(co.getPrice());
         dto.setStatus(co.getStatus());
         dto.setCreatedAt(co.getCreatedAt());

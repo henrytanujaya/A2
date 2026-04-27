@@ -8,7 +8,7 @@ Menghasilkan model 3D utuh (geometry & texture) dari satu foto unggahan customer
 ## Rencana Implementasi
 
 ### 1. Integrasi API AI 3D (Backend & Frontend)
-- **Service Integration**: Mengintegrasikan API dari penyedia layanan Generative 3D (seperti Tripo AI, Meshy, atau Rodin).
+- **Service Integration**: Mengintegrasikan API **Tripo AI** (Image-to-Model) untuk menghasilkan mesh 3D dari unggahan user.
 - **Workflow Generasi**:
     1. User mengunggah foto.
     2. Backend mengirim foto ke API AI untuk proses "Image-to-3D".
@@ -36,7 +36,7 @@ Menghasilkan model 3D utuh (geometry & texture) dari satu foto unggahan customer
 ---
 
 ## 5. Apa yang Dibutuhkan untuk Menjalankan Rencana Ini
-1. **API Key Generative 3D**: Berlangganan layanan seperti Tripo AI atau Meshy AI.
+1. **API Key Tripo AI**: Sudah tersedia (`tsk_a0kMT8...`).
 2. **Library `@react-three/drei`**: Untuk akses `useGLTF` dan `Environment` yang memudahkan pengelolaan model 3D.
 3. **Backend Storage**: Kapasitas storage (misal: S3 atau Cloudinary) yang mencukupi untuk menyimpan file `.glb` yang ukurannya lebih besar dibanding gambar biasa.
 4. **Webhook Handler**: Endpoint di backend untuk menerima notifikasi saat proses generasi 3D oleh AI selesai.

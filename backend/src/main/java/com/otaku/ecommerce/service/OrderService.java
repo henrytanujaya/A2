@@ -1,6 +1,7 @@
 package com.otaku.ecommerce.service;
 
 import com.otaku.ecommerce.dto.OrderItemRequestDTO;
+import com.otaku.ecommerce.dto.OrderItemResponseDTO;
 import com.otaku.ecommerce.dto.OrderRequestDTO;
 import com.otaku.ecommerce.dto.OrderResponseDTO;
 import com.otaku.ecommerce.entity.*;
@@ -26,9 +27,10 @@ public class OrderService {
 
     // Validasi transisi status order
     private static final Map<String, List<String>> VALID_TRANSITIONS = Map.of(
-        "Pending",              List.of("Waiting_Verification", "Processing", "Cancelled"),
-        "Waiting_Verification", List.of("Processing", "Cancelled"),
+        "Pending",              List.of("Waiting_Verification", "Processing", "Paid", "Shipped", "Cancelled"),
+        "Waiting_Verification", List.of("Processing", "Paid", "Shipped", "Cancelled"),
         "Processing",           List.of("Shipped", "Cancelled"),
+        "Paid",                 List.of("Processing", "Shipped", "Cancelled"),
         "Shipped",              List.of("Completed"),
         "Completed",            List.of(),
         "Cancelled",            List.of()
@@ -202,6 +204,15 @@ public class OrderService {
             }
             order.setStatus(status);
             addTrackingHistory(orderId, status, "Status pesanan diperbarui menjadi: " + status);
+            
+            // AUTOMATION: Jika status berubah ke Processing/Shipped dan resi masih kosong, generate otomatis
+            if (("Processing".equals(status) || "Shipped".equals(status)) && (order.getTrackingNumber() == null || order.getTrackingNumber().isEmpty())) {
+                String courier = order.getCourierCode() != null ? order.getCourierCode().toUpperCase() : "JNE";
+                String autoResi = "MOCK-" + courier + "-" + order.getId() + "-" + (int)(Math.random() * 9000 + 1000);
+                order.setTrackingNumber(autoResi);
+                order.setStatus("Shipped"); // Paksa ke Shipped jika sudah ada resi
+                addTrackingHistory(orderId, "Shipped", "Nomor resi otomatis dibuat: " + autoResi);
+            }
         }
 
         if (courierCode != null) order.setCourierCode(courierCode);
@@ -213,8 +224,46 @@ public class OrderService {
         log.info("[ORDER-UPDATE] Order {} updated: status={}, resi={}", orderId, status, trackingNumber);
     }
 
+    @Transactional
+    public boolean validateAndReduceStock(Integer orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new CustomBusinessException("OTK-4042", "Order tidak ditemukan", 404));
+        
+        boolean allSuccess = true;
+        for (OrderItem item : order.getItems()) {
+            if (item.getProduct() != null) {
+                int updatedRows = productRepository.reduceStock(item.getProduct().getId(), item.getQuantity());
+                if (updatedRows == 0) {
+                    allSuccess = false;
+                    log.warn("[STOCK] Gagal mengurangi stok untuk produk {}. Stok tidak mencukupi.", item.getProduct().getName());
+                }
+            }
+        }
+        return allSuccess;
+    }
+    
+    @Transactional
+    public void generateAutoTracking(Integer orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new CustomBusinessException("OTK-4042", "Order tidak ditemukan", 404));
+        
+        // Generate nomor resi simulasi yang bisa dilacak di Mock Mode (dimulai dengan MOCK)
+        String courier = order.getCourierCode() != null ? order.getCourierCode().toUpperCase() : "JNE";
+        String randomSuffix = String.valueOf((int)(Math.random() * 90000) + 10000);
+        String autoResi = "MOCK-" + courier + "-" + order.getId() + "-" + randomSuffix;
+        
+        order.setTrackingNumber(autoResi);
+        order.setStatus("Shipped"); // Langsung ke Shipped
+        order.setUpdatedAt(LocalDateTime.now());
+        orderRepository.save(order);
+        
+        addTrackingHistory(orderId, "Processing", "Pesanan sedang dikemas.");
+        addTrackingHistory(orderId, "Shipped", "Pesanan telah dikirim secara otomatis. Nomor Resi: " + autoResi);
+    }
+
     // ─── Order Tracking ───────────────────────────────────────────────────────
     @Transactional
+    @SuppressWarnings("null")
     public void addTrackingHistory(Integer orderId, String status, String description) {
         Order order = orderRepository.findById(orderId).orElse(null);
         if (order != null) {
@@ -248,6 +297,7 @@ public class OrderService {
     }
 
     // ─── Helper ───────────────────────────────────────────────────────────────
+    @SuppressWarnings("null")
     private OrderResponseDTO buildResponse(Order order, Discount discount) {
         OrderResponseDTO dto = new OrderResponseDTO();
         dto.setOrderId(order.getId());
@@ -260,6 +310,32 @@ public class OrderService {
         dto.setCourierName(order.getCourierName());
         dto.setCourierCode(order.getCourierCode());
         dto.setTrackingNumber(order.getTrackingNumber());
+        dto.setPaymentUrl(order.getPaymentUrl());
+        dto.setPaymentInvoiceId(order.getPaymentInvoiceId());
+        
+        List<OrderItemResponseDTO> itemDTOs = order.getItems().stream().map(item -> {
+            OrderItemResponseDTO idto = new OrderItemResponseDTO();
+            idto.setItemId(item.getId());
+            BigDecimal unitPrice = item.getUnitPrice() != null ? item.getUnitPrice() : java.math.BigDecimal.ZERO;
+            int qty = item.getQuantity() != null ? item.getQuantity() : 1;
+            idto.setQuantity(qty);
+            idto.setUnitPrice(unitPrice);
+            idto.setTotalPrice(unitPrice.multiply(new java.math.BigDecimal(qty)));
+            
+            if (item.getProduct() != null) {
+                idto.setProductName(item.getProduct().getName());
+                idto.setProductImage(item.getProduct().getImageUrl());
+                idto.setAvailableStock(item.getProduct().getStockQuantity());
+            } else if (item.getCustomOrder() != null) {
+                idto.setProductName("Custom Order: " + item.getCustomOrder().getServiceType());
+                idto.setCustomOrderId(item.getCustomOrder().getId());
+                idto.setProductImage(item.getCustomOrder().getPreviewImageUrl() != null ? 
+                                   item.getCustomOrder().getPreviewImageUrl() : 
+                                   item.getCustomOrder().getImageReferenceUrl());
+            }
+            return idto;
+        }).collect(Collectors.toList());
+        dto.setItems(itemDTOs);
         
         List<com.otaku.ecommerce.dto.OrderTrackingDTO> trackingDTOs = orderTrackingRepository.findByOrderIdOrderByCreatedAtDesc(order.getId())
                 .stream().map(t -> {

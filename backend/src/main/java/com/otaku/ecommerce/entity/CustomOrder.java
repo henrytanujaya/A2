@@ -26,6 +26,9 @@ public class CustomOrder {
     @Column(name = "ConfigurationJSON")
     private String configurationJson;
 
+    @Column(name = "preview_image_url")
+    private String previewImageUrl;
+
     // Harga NULL sampai Admin menetapkan via PATCH /admin/custom-orders/{id}/price
     @Column(name = "Price", precision = 18, scale = 2)
     private BigDecimal price;
@@ -47,6 +50,8 @@ public class CustomOrder {
     public void setImageReferenceUrl(String imageReferenceUrl) { this.imageReferenceUrl = imageReferenceUrl; }
     public String getConfigurationJson() { return configurationJson; }
     public void setConfigurationJson(String configurationJson) { this.configurationJson = configurationJson; }
+    public String getPreviewImageUrl() { return previewImageUrl; }
+    public void setPreviewImageUrl(String previewImageUrl) { this.previewImageUrl = previewImageUrl; }
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }
     public String getStatus() { return status; }

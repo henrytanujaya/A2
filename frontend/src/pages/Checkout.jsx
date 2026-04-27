@@ -174,14 +174,14 @@ export default function Checkout() {
         customer: { name: formData.name, email: formData.email, address: fullAddress },
         items: [...cart],
         summary: { subtotal, ppn, shipping: shippingFee, total: grandTotal },
-        paymentMethod: 'Bank Transfer',
-        courier: `${formData.courier.toUpperCase()} - ${selectedOption.service}`,
+        paymentMethod: 'Xendit (VA, E-Wallet, Retail)',
+        courier: `${formData.courier.toUpperCase()} - ${selectedOption.serviceName}`,
         status: 'UNPAID',
         paymentUrl: paymentData.paymentUrl
       };
 
-      showModal('Order berhasil dibuat! Mengalihkan ke pembayaran...', 'success', () => {
-        navigate('/invoice', { state: { invoiceData } });
+      showModal('Order berhasil dibuat! Mengalihkan ke daftar pesanan...', 'success', () => {
+        navigate('/my-orders');
       });
 
     } catch (error) {
@@ -284,17 +284,17 @@ export default function Checkout() {
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', marginBottom: '8px', color: '#a0a0b0', fontSize: '0.9rem' }}>Pilih Kurir</label>
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  {['jne', 'jnt', 'sicepat', 'anteraja', 'pos'].map(c => (
+                  {['jne', 'sicepat'].map(c => (
                     <button
                       key={c} type="button"
                       onClick={() => setFormData(prev => ({ ...prev, courier: c }))}
                       style={{ 
-                        flex: '1 1 80px', padding: '10px', borderRadius: '8px', border: formData.courier === c ? '1px solid #dc143c' : '1px solid #333',
+                        flex: '1 1 120px', padding: '12px', borderRadius: '8px', border: formData.courier === c ? '1px solid #dc143c' : '1px solid #333',
                         background: formData.courier === c ? 'rgba(220, 20, 60, 0.1)' : 'rgba(0,0,0,0.2)',
-                        color: formData.courier === c ? '#dc143c' : '#888', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.75rem'
+                        color: formData.courier === c ? '#dc143c' : '#888', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem'
                       }}
                     >
-                      {c.toUpperCase()}
+                      {c === 'jne' ? 'JNE Express' : 'SiCepat Ekspres'}
                     </button>
                   ))}
                 </div>

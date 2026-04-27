@@ -1,0 +1,10 @@
+CREATE TABLE PaymentLogs (
+    LogID INT IDENTITY(1,1) PRIMARY KEY,
+    OrderID INT NOT NULL,
+    ExternalID NVARCHAR(255),
+    Status NVARCHAR(50),
+    Amount DECIMAL(18,2),
+    RawPayload NVARCHAR(MAX),
+    CreatedAt DATETIME DEFAULT GETDATE(),
+    FOREIGN KEY (OrderID) REFERENCES Orders(OrderID)
+);

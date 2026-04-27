@@ -30,10 +30,12 @@ export default function Cart() {
               }}>
                 {/* Image Handle */}
                 <div style={{ width: '100px', height: '100px', background: '#111', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, border: '1px solid #333' }}>
-                  {item.image ? (
-                     <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  {(item.imageUrl || item.image) ? (
+                     <img src={item.imageUrl || item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                   ) : (
-                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#444' }}>No Img</div>
+                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#444', fontSize: '10px', textAlign: 'center', padding: '5px' }}>
+                        OTAKU PREMIUM
+                     </div>
                   )}
                 </div>
                 

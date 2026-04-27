@@ -100,6 +100,13 @@
             <version>1.38.0</version>
         </dependency>
 
+        <!-- Dotenv — Load environment variables from .env file -->
+        <dependency>
+            <groupId>io.github.cdimascio</groupId>
+            <artifactId>dotenv-java</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
         <!-- Swagger OpenAPI Docs -->
         <dependency>
             <groupId>org.springdoc</groupId>

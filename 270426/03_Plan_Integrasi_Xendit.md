@@ -9,10 +9,10 @@ Menggantikan sistem pembayaran mock dengan **Xendit** untuk mendukung metode pem
 1. Tambahkan dependensi `xendit-java` di `pom.xml` (Opsional, bisa menggunakan `RestTemplate` atau `WebClient` untuk fleksibilitas).
 2. Tambahkan properti di `application.properties`:
    ```properties
-   xendit.api-key=xnd_development_...
-   xendit.callback-token=...
-   xendit.webhook-url=https://yourdomain.com/api/payments/webhook
-   ```
+    xendit.api-key=xnd_development_kCHlFnBu9vmObELqkdzbBfjbFNoiDJxUGSvHrRS2DOyiLXjWnfw5eZ9OIbxL6n
+    xendit.callback-token=TakCix3A3SSJsL9YOAVcfbIUwIncbMkxgBjVX0v10J0NB1nV
+    xendit.webhook-url=https://yourdomain.com/api/payments/webhook
+    ```
 
 ### B. Implementasi `PaymentService.java`
 1. **Create Invoice**:
@@ -58,7 +58,7 @@ Menggantikan sistem pembayaran mock dengan **Xendit** untuk mendukung metode pem
 ---
 
 ## 6. Apa yang Dibutuhkan untuk Menjalankan Rencana Ini
-1. **Akun Xendit Aktif**: Memerlukan Secret Key dan Public Key dari dashboard Xendit.
+1. **Akun Xendit Aktif**: API Key dan Callback Token sudah tersedia.
 2. **Webhook URL Publik**: Server backend harus bisa diakses secara publik (atau menggunakan `ngrok` saat development) agar Xendit bisa mengirim callback.
 3. **Konfigurasi SSL**: Disarankan menggunakan HTTPS untuk endpoint webhook demi keamanan data.
 4. **Database Migration**: Menambahkan kolom `payment_invoice_id` dan `payment_status` pada tabel `Orders`.

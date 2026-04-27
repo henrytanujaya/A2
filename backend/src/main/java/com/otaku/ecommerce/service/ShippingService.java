@@ -2,18 +2,32 @@ package com.otaku.ecommerce.service;
 
 import com.otaku.ecommerce.dto.ShippingAreaDTO;
 import com.otaku.ecommerce.dto.ShippingRateDTO;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
-/**
- * ShippingService — Sepenuhnya mandiri, tanpa dependensi API eksternal.
- * Berisi data 40 area kota besar Indonesia dan tarif 5 kurir populer.
- * Data tarif dihitung secara dinamis berdasarkan berat paket.
- */
 @Service
 public class ShippingService {
+
+    @Value("${binderbyte.api-key}")
+    private String apiKey;
+
+    @Value("${binderbyte.base-url}")
+    private String baseUrl;
+
+    @Value("${binderbyte.origin}")
+    private String origin;
+
+    private final RestTemplate restTemplate;
+
+    public ShippingService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
     // ─── Pencarian Area Kota ──────────────────────────────────────────────────
     public ShippingAreaDTO searchAreas(String query) {
@@ -94,61 +108,108 @@ public class ShippingService {
     }
 
     // ─── Kalkulasi Tarif Pengiriman ───────────────────────────────────────────
-    public ShippingRateDTO getShippingCost(String destinationId, int weightGram, String courierFilter) {
+    @SuppressWarnings("unchecked")
+    public ShippingRateDTO getShippingCost(String destination, int weightGram, String courierFilter) {
         ShippingRateDTO result = new ShippingRateDTO();
-        result.setSuccess(true);
-
-        // Harga dasar: Rp 9.000 per 500g (minimum 9.000)
-        int kg500 = (int) Math.max(1, Math.ceil((double) weightGram / 500));
-        long basePrice = kg500 * 9_000L;
-
-        // {kode, nama, nama_layanan, kode_layanan, multiplier, estimasi_hari}
-        Object[][] catalog = {
-            {"jne",      "JNE",           "JNE Reguler",        "REG",  1.00, "2-3"},
-            {"jne",      "JNE",           "JNE Oke",            "OKE",  0.80, "4-6"},
-            {"jne",      "JNE",           "JNE YES",            "YES",  2.20, "1"},
-            {"jnt",      "J&T Express",   "J&T Express",        "EZ",   1.05, "2-3"},
-            {"jnt",      "J&T Express",   "J&T Economy",        "EX",   0.88, "3-5"},
-            {"sicepat",  "SiCepat",       "SiCepat BEST",       "BEST", 1.00, "2-3"},
-            {"sicepat",  "SiCepat",       "SiCepat HALU",       "HALU", 2.10, "1"},
-            {"anteraja", "AnterAja",      "AnterAja Reguler",   "REG",  1.00, "2-4"},
-            {"anteraja", "AnterAja",      "AnterAja Next Day",  "ND",   1.80, "1"},
-            {"pos",      "POS Indonesia", "POS Kilat Khusus",   "SKH",  0.90, "3-5"},
-            {"pos",      "POS Indonesia", "POS Express Semalam","EXS",  2.00, "1"},
-        };
-
-        String filter = (courierFilter != null) ? courierFilter.toLowerCase().trim() : "";
-        List<ShippingRateDTO.CourierOption> options = new ArrayList<>();
-
-        for (Object[] r : catalog) {
-            String code = (String) r[0];
-            if (!filter.isBlank() && !code.equals(filter)) continue;
-
-            ShippingRateDTO.CourierOption opt = new ShippingRateDTO.CourierOption();
-            opt.setCourierCode(code);
-            opt.setCourierName((String) r[1]);
-            opt.setServiceName((String) r[2]);
-            opt.setServiceCode((String) r[3]);
-            opt.setPrice(Math.round(basePrice * (Double) r[4]));
-            opt.setEstimatedDay((String) r[5]);
-            options.add(opt);
-        }
-
-        // Jika filter tidak cocok dengan kurir manapun, tampilkan semua
-        if (options.isEmpty()) {
-            for (Object[] r : catalog) {
-                ShippingRateDTO.CourierOption opt = new ShippingRateDTO.CourierOption();
-                opt.setCourierCode((String) r[0]);
-                opt.setCourierName((String) r[1]);
-                opt.setServiceName((String) r[2]);
-                opt.setServiceCode((String) r[3]);
-                opt.setPrice(Math.round(basePrice * (Double) r[4]));
-                opt.setEstimatedDay((String) r[5]);
-                options.add(opt);
+        
+        try {
+            // 1. Resolusi ID ke Nama Kota
+            String targetDestination = destination;
+            if (destination.contains("-")) { 
+                ShippingAreaDTO areaSearch = searchAreas(""); 
+                for (ShippingAreaDTO.Area a : areaSearch.getAreas()) {
+                    if (a.getId().equalsIgnoreCase(destination)) {
+                        targetDestination = a.getCity(); 
+                        break;
+                    }
+                }
             }
-        }
 
-        result.setCouriers(options);
+            // 2. Persiapkan Parameter & Headers (Binderbyte V1 Cost preferred format)
+            String couriers = (courierFilter != null && !courierFilter.isBlank()) 
+                    ? courierFilter.toLowerCase() 
+                    : "jne,sicepat,jnt";
+
+            // Normalisasi Nama Kota untuk Binderbyte (menghilangkan 'KOTA ADM.' jika ada)
+            String originName = origin.toLowerCase().replace("kota adm. ", "").replace("kab. ", "").trim();
+            String destName = targetDestination.toLowerCase().replace("kota adm. ", "").replace("kab. ", "").trim();
+
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.setContentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED);
+
+            org.springframework.util.MultiValueMap<String, String> map = new org.springframework.util.LinkedMultiValueMap<>();
+            map.add("api_key", apiKey);
+            map.add("origin", originName);
+            map.add("destination", destName);
+            map.add("weight", String.valueOf(weightGram));
+            map.add("courier", couriers);
+
+            org.springframework.http.HttpEntity<org.springframework.util.MultiValueMap<String, String>> entity = new org.springframework.http.HttpEntity<>(map, headers);
+
+            // 3. Panggil API Binderbyte
+            String url = baseUrl + "/cost";
+            System.out.println("[SHIPPING-DEBUG] Requesting Binderbyte: " + url + " with map: " + map);
+            Map<String, Object> response = restTemplate.postForObject(url, entity, Map.class);
+            System.out.println("[SHIPPING-DEBUG] Binderbyte Response: " + response);
+            
+            // 4. Proses Respons
+            if (response != null && ("200".equals(String.valueOf(response.get("code"))) || "200".equals(String.valueOf(response.get("status"))))) {
+                Object dataObj = response.get("data");
+                if (dataObj instanceof Map) {
+                    Map<String, Object> dataMap = (Map<String, Object>) dataObj;
+                    List<Map<String, Object>> costs = (List<Map<String, Object>>) dataMap.get("costs");
+                    
+                    List<ShippingRateDTO.CourierOption> options = new ArrayList<>();
+                    if (costs != null) {
+                        for (Map<String, Object> cost : costs) {
+                            ShippingRateDTO.CourierOption opt = new ShippingRateDTO.CourierOption();
+                            opt.setCourierCode(String.valueOf(cost.get("courier")).toLowerCase());
+                            opt.setCourierName(String.valueOf(cost.get("courier")));
+                            opt.setServiceName(String.valueOf(cost.get("service")));
+                            opt.setServiceCode(String.valueOf(cost.get("service")));
+                            opt.setPrice(Long.parseLong(String.valueOf(cost.get("cost"))));
+                            opt.setEstimatedDay(String.valueOf(cost.get("etd")));
+                            options.add(opt);
+                        }
+                    }
+                    result.setSuccess(true);
+                    result.setCouriers(options);
+                } else {
+                    throw new RuntimeException("Binderbyte data format error");
+                }
+            } else {
+                throw new RuntimeException("Binderbyte API returned " + (response != null ? response.get("code") : "null"));
+            }
+        } catch (Exception e) {
+            System.err.println("[SHIPPING-ERROR] API Call Failed: " + e.getMessage());
+            
+            // FALLBACK MODE: Jika API gagal (Error 400, Timeout, dll),
+            // tetap berikan tarif simulasi agar user tidak stuck di checkout.
+            List<ShippingRateDTO.CourierOption> mockOptions = new ArrayList<>();
+            
+            ShippingRateDTO.CourierOption mockJne = new ShippingRateDTO.CourierOption();
+            mockJne.setCourierCode("jne");
+            mockJne.setCourierName("JNE (Simulated)");
+            mockJne.setServiceCode("REG");
+            mockJne.setServiceName("Reguler");
+            mockJne.setPrice(15000L);
+            mockJne.setEstimatedDay("2-3");
+            mockOptions.add(mockJne);
+
+            ShippingRateDTO.CourierOption mockSicepat = new ShippingRateDTO.CourierOption();
+            mockSicepat.setCourierCode("sicepat");
+            mockSicepat.setCourierName("SiCepat (Simulated)");
+            mockSicepat.setServiceCode("REG");
+            mockSicepat.setServiceName("Reguler");
+            mockSicepat.setPrice(12000L);
+            mockSicepat.setEstimatedDay("1-2");
+            mockOptions.add(mockSicepat);
+
+            result.setSuccess(true);
+            result.setCouriers(mockOptions);
+            result.setMessage("Using simulated rates (API error: " + e.getMessage() + ")");
+        }
+        
         return result;
     }
 }

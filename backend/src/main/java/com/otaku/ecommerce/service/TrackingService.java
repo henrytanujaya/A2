@@ -17,13 +17,13 @@ public class TrackingService {
 
     private final RestTemplate restTemplate;
 
-    public TrackingService() {
-        this.restTemplate = new RestTemplate();
+    public TrackingService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
     }
 
     public TrackingResponseDTO trackPackage(String courier, String awb) {
         // --- Simulasi untuk testing (MOCK MODE) ---
-        if ("MOCK123".equals(awb)) {
+        if (awb != null && awb.startsWith("MOCK")) {
             TrackingResponseDTO mock = new TrackingResponseDTO();
             mock.setStatus(200);
             mock.setMessage("Simulated tracking data");

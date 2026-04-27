@@ -6,17 +6,23 @@ Projek ini dikembangkan dengan arsitektur modern yang membutuhkan beberapa integ
 | :--- | :--- | :--- | :--- |
 | **Database** | `DB_USERNAME` | `sa` | Username database SQL Server. |
 | **Database** | `DB_PASSWORD` | `password` | Password database SQL Server. |
+| **Database** | `DB_URL` | `jdbc:sqlserver://localhost:1433;databaseName=OtakuECommerce;encrypt=true;trustServerCertificate=true` | URL koneksi JDBC SQL Server. |
 | **Security** | `JWT_SECRET` | `OtakuEcommerce...` | Key untuk enkripsi token JWT (Ganti di produksi!). |
-| **Logistik** | `BINDERBYTE_API_KEY` | `f3f50808...` (Inputted) | API Key untuk cek ongkir & tracking Binderbyte. |
-| **Pembayaran**| `XENDIT_SECRET_KEY` | *Perlu Input* | Secret Key dari Dashboard Xendit. |
-| **Pembayaran**| `XENDIT_CALLBACK_TOKEN`| *Perlu Input* | Verification token untuk webhook Xendit. |
-| **Media** | `CLOUDINARY_CLOUD_NAME`| *Perlu Input* | Nama cloud di Cloudinary. |
-| **Media** | `CLOUDINARY_API_KEY` | *Perlu Input* | API Key dari Cloudinary. |
-| **Media** | `CLOUDINARY_API_SECRET` | *Perlu Input* | API Secret dari Cloudinary. |
-| **3D Engine** | `TRIPO_AI_API_KEY` | *Perlu Input* | API Key untuk Generative 3D dari Tripo AI. |
+| **Logistik** | `BINDERBYTE_API_KEY` | `42d3dfaf1886c657a2dbc5bce42878fbe1b9260074ab47341bb20e0ce0c76133` | API Key untuk cek ongkir & tracking Binderbyte. |
+| **Logistik** | `SHIPPING_ORIGIN` | `jakarta utara` | Lokasi asal pengiriman (Nama Kota/Kecamatan). |
+| **Pembayaran**| `XENDIT_SECRET_KEY` | `xnd_development_kCHlFnBu9vmObELqkdzbBfjbFNoiDJxUGSvHrRS2DOyiLXjWnfw5eZ9OIbxL6n` | Secret Key dari Dashboard Xendit. |
+| **Pembayaran**| `XENDIT_CALLBACK_TOKEN`| `TakCix3A3SSJsL9YOAVcfbIUwIncbMkxgBjVX0v10J0NB1nV` | Verification token untuk webhook Xendit. |
+| **Media** | `CLOUDINARY_CLOUD_NAME`| `dvyuk3imn` | Nama cloud di Cloudinary. |
+| **Media** | `CLOUDINARY_API_KEY` | `221798975154623` | API Key dari Cloudinary. |
+| **Media** | `CLOUDINARY_API_SECRET` | `xviTxyjLUXElj4YfyT55Pj-Sf1k` | API Secret dari Cloudinary. |
+| **Media** | `CLOUDINARY_UPLOAD_PRESET`| `otaku_ecommerce` | Nama Upload Preset (untuk optimasi & folder). |
+| **3D Engine** | `TRIPO_AI_API_KEY` | `tsk_a0kMT8MtdIRcrcdxWcd0qjB1KDDw0lYFNbxSjXPUHvY` | API Key untuk Generative 3D (Image-to-3D) dari Tripo AI. |
 | **Redis** | `REDIS_HOST` | `localhost` | Host server Redis untuk cache & session. |
 | **Redis** | `REDIS_PORT` | `6379` | Port server Redis. |
 | **Redis** | `REDIS_PASSWORD` | *Kosong* | Password Redis (jika ada). |
+| **App Config** | `SERVER_PORT` | `8321` | Port untuk menjalankan Backend. |
+| **App Config** | `FRONTEND_URL` | `http://localhost:5173` | URL Frontend (Vite) untuk CORS. |
+| **App Config** | `BACKEND_URL` | `http://localhost:8321` | URL Backend untuk Webhook/Callback. |
 
 ---
 
@@ -29,7 +35,11 @@ Projek ini merupakan aplikasi e-commerce modern dengan arsitektur **Decoupled (F
 - **Database**: SQL Server (MSSQL) dengan **Flyway** untuk migrasi skema secara teratur.
 - **Keamanan**: Spring Security dengan autentikasi berbasis JWT. Menggunakan **Redis** untuk blacklist token dan manajemen sesi.
 - **Rate Limiting**: Menggunakan **Bucket4j** untuk perlindungan terhadap serangan brute-force atau DDoS ringan.
-- **Media**: Terintegrasi dengan **Cloudinary** sebagai penyimpanan utama. Selain untuk gambar produk katalog, Cloudinary akan digunakan untuk menyimpan **snapshot desain** (Custom Apparel) dan **hasil render 3D** (Custom 3D) yang diunggah oleh pelanggan, guna memastikan ketersediaan data yang persisten dan cepat.
+- **Media**: Terintegrasi dengan **Cloudinary** sebagai penyimpanan utama. Selain untuk gambar produk katalog, Cloudinary akan digunakan untuk menyimpan **snapshot desain** (Custom Apparel) dan **hasil render 3D** (Custom 3D).
+    - **Struktur Folder Cloudinary**:
+        - `otaku/products`: Foto katalog produk.
+        - `otaku/apparel-designs`: Mockup desain custom dari user.
+        - `otaku/3d-models`: Aset file/render 3D hasil generator.
 - **Dokumentasi**: Menggunakan **Swagger/OpenAPI 3.0** yang dapat diakses di `/swagger-ui/index.html`.
 
 ### Frontend (React + Vite)
@@ -37,7 +47,7 @@ Projek ini merupakan aplikasi e-commerce modern dengan arsitektur **Decoupled (F
 - **Styling**: Tailwind CSS (Desain premium, responsif).
 - **State Management**: React Context API (`CartContext`, `ModalContext`).
 - **Networking**: Axios dengan interceptor untuk menangani token JWT.
-- **Fitur Utama**: Custom 3D preview (placeholder/logic), Custom Apparel, Katalog Produk, dan Manajemen Keranjang.
+- **Fitur Utama**: Custom 3D Action Figure (Image-to-3D), Custom Apparel (Mockup Design), Katalog Produk, dan Manajemen Keranjang.
 
 ---
 
@@ -86,7 +96,7 @@ Projek ini merupakan aplikasi e-commerce modern dengan arsitektur **Decoupled (F
 - **Akun Cloudinary**: Untuk penyimpanan aset desain dan render 3D.
 - **Akun Xendit (Dashboard)**: Untuk mendapatkan API Key dan konfigurasi webhook pembayaran.
 - **Akun Binderbyte**: Untuk integrasi tracking logistik dan cek ongkir.
-- **Akun Tripo AI / Meshy**: Untuk API Generative 3D Mesh.
+- **Akun Tripo AI**: Untuk API Generative 3D (Image-to-3D) dari foto/sketsa customer.
 
 ### Environment Backend
 - **Java 21 & Maven**: Untuk pengembangan backend Spring Boot.

@@ -28,9 +28,10 @@ Analisis pada alur pembayaran menemukan adanya kendala pada sinkronisasi status 
 
 ---
 
+**Catatan Integrasi Xendit**: Sebagian besar verifikasi status ini akan diotomatisasi melalui Webhook Xendit, namun fitur polling tetap diperlukan untuk fallback dan update UI instan.
+
 ## 4. Apa yang Dibutuhkan untuk Menjalankan Rencana Ini
 1. **API Status Check**: Endpoint GET `/api/v1/orders/{id}` yang efisien dan mengembalikan status terbaru langsung dari database utama (bukan cache yang stale).
 2. **Frontend Polling Logic**: Penggunaan `useEffect` dengan `setInterval` dan pembersihan interval (cleanup function) untuk mencegah memory leak.
 3. **Cache-Control Header**: Pengaturan header HTTP pada response backend atau request frontend untuk menghindari caching pada data sensitif status order.
 4. **Toast/Notification Library**: Library seperti `react-hot-toast` atau `react-toastify` untuk memberikan feedback visual saat status berubah.
-

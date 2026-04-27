@@ -1,69 +1,54 @@
 package com.otaku.ecommerce.service;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import com.otaku.ecommerce.exception.CustomBusinessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
-import java.util.UUID;
+import java.util.Map;
 
 @Service
 public class CloudinaryUploadService {
 
     private static final Logger log = LoggerFactory.getLogger(CloudinaryUploadService.class);
 
-    private static final List<String> ALLOWED_MIME = List.of("image/png", "image/jpeg");
+    private static final List<String> ALLOWED_MIME = List.of("image/png", "image/jpeg", "image/webp");
     private static final long MAX_BYTES = 10L * 1024 * 1024; // 10 MB
 
-    @Value("${storage.outfit-dir}") private String outfitDir;
-    @Value("${storage.figure-dir}") private String figureDir;
+    @Autowired
+    private Cloudinary cloudinary;
 
     public String uploadOutfitReference(MultipartFile file) throws IOException {
-        validateFile(file);
-        return saveFileLocally(file, outfitDir, "outfit");
+        return uploadToCloudinary(file, "otaku/apparel-designs");
     }
 
     public String uploadFigureReference(MultipartFile file) throws IOException {
-        validateFile(file);
-        return saveFileLocally(file, figureDir, "figure");
+        return uploadToCloudinary(file, "otaku/3d-models");
     }
 
-    private String saveFileLocally(MultipartFile file, String directory, String prefix) throws IOException {
-        Path uploadPath = Paths.get(directory);
+    @SuppressWarnings("unchecked")
+    private String uploadToCloudinary(MultipartFile file, String folder) throws IOException {
+        validateFile(file);
         
-        // Buat folder jika belum ada
-        if (!Files.exists(uploadPath)) {
-            Files.createDirectories(uploadPath);
+        try {
+            Map<String, Object> uploadResult = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.asMap(
+                "folder", folder,
+                "resource_type", "auto"
+            ));
+            
+            String url = (String) uploadResult.get("secure_url");
+            log.info("[CLOUDINARY-OK] File uploaded to: {}", url);
+            return url;
+        } catch (Exception e) {
+            log.error("[CLOUDINARY-ERR] Upload failed: {}", e.getMessage());
+            throw new CustomBusinessException("OTK-500", "Gagal mengunggah gambar ke cloud: " + e.getMessage(), 500);
         }
-
-        // Generate nama file unik
-        String extension = getFileExtension(file.getOriginalFilename());
-        String fileName = prefix + "_" + UUID.randomUUID().toString() + extension;
-        Path targetLocation = uploadPath.resolve(fileName);
-
-        // Simpan file
-        Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
-        
-        log.info("[STORAGE-OK] File saved locally at: {}", targetLocation.toString());
-
-        // Kembalikan URL yang bisa diakses (localhost:8321/uploads/...)
-        String fileDownloadUri = ServletUriComponentsBuilder.fromCurrentContextPath()
-                .path("/")
-                .path(directory)
-                .path("/")
-                .path(fileName)
-                .toUriString();
-                
-        return fileDownloadUri;
     }
 
     private void validateFile(MultipartFile file) {
@@ -71,14 +56,9 @@ public class CloudinaryUploadService {
             throw new CustomBusinessException("OTK-4101", "File tidak boleh kosong.", 400);
 
         if (file.getContentType() == null || !ALLOWED_MIME.contains(file.getContentType()))
-            throw new CustomBusinessException("OTK-4099", "Hanya PNG/JPG yang diizinkan.", 400);
+            throw new CustomBusinessException("OTK-4099", "Hanya PNG/JPG/WEBP yang diizinkan.", 400);
 
         if (file.getSize() > MAX_BYTES)
             throw new CustomBusinessException("OTK-4100", "File terlalu besar (Maks 10MB).", 400);
-    }
-
-    private String getFileExtension(String fileName) {
-        if (fileName == null || !fileName.contains(".")) return ".jpg";
-        return fileName.substring(fileName.lastIndexOf("."));
     }
 }

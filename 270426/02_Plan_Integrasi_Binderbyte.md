@@ -9,7 +9,7 @@ Menggunakan API **Binderbyte** untuk otomatisasi pencarian lokasi, kalkulasi bia
 1. **API Endpoint**: `/v1/cost` (Binderbyte).
 2. **Logic**:
    - Di `ShippingService.java`, ganti kalkulasi manual dengan request ke Binderbyte.
-   - Input: `origin` (ID Kota Gudang), `destination` (ID Kota User), `weight`, `courier`.
+   - Input: `origin` (jakarta utara), `destination` (Nama Kota/Kecamatan User), `weight`, `courier`.
    - Output: List layanan kurir (REG, OKE, YES) beserta harga dan estimasi sampai.
 
 ### B. Pencarian Area (Lokasi)

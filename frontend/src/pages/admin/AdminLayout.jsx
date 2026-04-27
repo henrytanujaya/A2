@@ -8,10 +8,10 @@ export default function AdminLayout({ setIsLoggedIn }) {
   const location = useLocation();
 
   const handleLogout = () => {
-    localStorage.removeItem('userData');
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    setIsLoggedIn(false);
+    localStorage.removeItem('adminUserData');
+    localStorage.removeItem('adminAccessToken');
+    localStorage.removeItem('adminRefreshToken');
+    // setIsLoggedIn(false); // Jangan set global login ke false jika masih ingin customer tetap login
     navigate('/login');
   };
 

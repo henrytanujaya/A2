@@ -7,10 +7,10 @@ Menyediakan penyimpanan yang persisten, aman, dan berkinerja tinggi untuk gambar
 
 ## 2. Strategi Penyimpanan Folder
 Untuk menjaga kerapihan data, penyimpanan di Cloudinary akan dibagi menjadi beberapa folder:
-- `products/`: Foto produk asli dari katalog.
-- `custom_apparel/`: Hasil capture/snapshot desain dari menu Custom Apparel.
-- `custom_3d/`: Hasil capture render dari menu 3D Figure.
-- `user_uploads/`: Gambar asli (source asset) yang diunggah user sebelum diolah.
+- `otaku/products/`: Foto produk asli dari katalog.
+- `otaku/apparel-designs/`: Hasil capture/snapshot desain dari menu Custom Apparel.
+- `otaku/3d-models/`: Hasil model 3D (.glb) dan render preview dari menu 3D Figure.
+- `otaku/temp/`: File sementara saat proses upload sebelum dipindahkan.
 
 ## 3. Rencana Implementasi
 
@@ -26,7 +26,7 @@ Untuk menjaga kerapihan data, penyimpanan di Cloudinary akan dibagi menjadi bebe
 - Menggunakan fitur **Auto-format (f_auto)** dan **Auto-quality (q_auto)** dari Cloudinary untuk memastikan gambar snapshot yang dilihat Admin tetap tajam namun berukuran kecil (hemat bandwidth).
 
 ## 4. Apa yang Dibutuhkan untuk Menjalankan Rencana Ini
-1. **Cloudinary Cloud Name, API Key, & API Secret**: Didapatkan dari dashboard Cloudinary.
-2. **Upload Preset**: Konfigurasi di Cloudinary (Settings -> Upload) untuk mengizinkan upload tanpa signature (opsional namun disarankan untuk efisiensi frontend).
+1. **Cloudinary API Credentials**: Sudah tersedia (`dvyuk3imn`, dll).
+2. **Upload Preset**: Menggunakan preset `otaku_ecommerce` (Signed).
 3. **Library Cloudinary**: `com.cloudinary:cloudinary-http44` ditambahkan ke `pom.xml`.
 4. **Environment Variables**: Penambahan key Cloudinary ke dalam file `.env`.

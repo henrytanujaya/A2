@@ -29,6 +29,7 @@ public class UserService {
     }
 
     // ─── Change Role (Admin) ──────────────────────────────────────────────────
+    @SuppressWarnings("null")
     public UserDTO changeRole(Integer id, String newRole) {
         if (id == null) throw new CustomBusinessException("OTK-4010", "ID tidak boleh kosong", 400);
         if (!List.of("Customer", "Admin").contains(newRole))
@@ -55,6 +56,7 @@ public class UserService {
     }
 
     // ─── Update Profile ───────────────────────────────────────────────────────
+    @SuppressWarnings("null")
     public UserDTO updateProfile(String email, com.otaku.ecommerce.dto.UserProfileUpdateRequestDTO request) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomBusinessException("OTK-4041", "User tidak ditemukan", 404));
@@ -73,6 +75,7 @@ public class UserService {
     }
 
     // ─── Helper ───────────────────────────────────────────────────────────────
+    @SuppressWarnings("null")
     private UserDTO toDTO(User user) {
         UserDTO dto = new UserDTO();
         dto.setId(user.getId());

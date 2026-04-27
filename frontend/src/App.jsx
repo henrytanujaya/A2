@@ -38,8 +38,8 @@ function AppContent() {
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
   const isAdminPage = location.pathname.startsWith('/admin');
 
-  const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-  const isAdmin = userData?.role === 'Admin';
+  // Admin login check menggunakan adminAccessToken
+  const isAdmin = !!localStorage.getItem('adminAccessToken');
 
   return (
     <>

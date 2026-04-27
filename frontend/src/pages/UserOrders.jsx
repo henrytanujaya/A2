@@ -1,44 +1,83 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Package, ArrowRight, CreditCard, Loader2, Truck } from 'lucide-react';
+import { Package, ArrowRight, CreditCard, Loader2, Truck, AlertTriangle } from 'lucide-react';
 import axiosInstance from '../api/axiosInstance';
+import { useModal } from '../contexts/ModalContext';
 
 export default function UserOrders() {
   const [activeTab, setActiveTab] = useState('unpaid');
   const [unpaidOrders, setUnpaidOrders] = useState([]);
-  const [paidOrders, setPaidOrders] = useState([]);
+  const [waitingOrders, setWaitingOrders] = useState([]);
+  const [shippingOrders, setShippingOrders] = useState([]);
+  const [rejectedOrders, setRejectedOrders] = useState([]);
+  const [completedOrders, setCompletedOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [prevStatuses, setPrevStatuses] = useState({}); // Untuk deteksi perubahan status
   const navigate = useNavigate();
+  const { showModal } = useModal();
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      setLoading(true);
+    const fetchOrders = async (isPolling = false) => {
+      if (!isPolling) setLoading(true);
       try {
         const res = await axiosInstance.get('/api/v1/orders');
         if (res.data.success) {
           const allOrders = res.data.data;
-          // Filter: Pending = Unpaid, Others = Paid
+          
+          setPrevStatuses(prev => {
+            // Deteksi Perubahan Status (Real-time Popup)
+            allOrders.forEach(order => {
+               const oldStatus = prev[order.orderId];
+               if (oldStatus && oldStatus !== order.status) {
+                  if (order.status === 'Shipped' || order.status === 'Processing') {
+                     showModal(`Hore! Pesanan INV-${order.orderId} telah dikonfirmasi Admin dan sedang disiapkan.`, 'success');
+                  } else if (order.status === 'STOCK_CONFLICT') {
+                     showModal(`Perhatian: Pesanan INV-${order.orderId} memiliki kendala stok. Harap hubungi Admin untuk penyesuaian.`, 'error');
+                  }
+               }
+            });
+
+            // Update Map Status baru
+            const newStatusMap = {};
+            allOrders.forEach(o => newStatusMap[o.orderId] = o.status);
+            return newStatusMap;
+          });
+
+          // Filter Kategorisasi
           const unpaid = allOrders.filter(o => o.status === 'Pending').reverse();
-          const paid = allOrders.filter(o => o.status !== 'Pending').reverse();
+          const waiting = allOrders.filter(o => o.status === 'Waiting_Verification' || o.status === 'STOCK_CONFLICT').reverse();
+          const shipping = allOrders.filter(o => o.status === 'Processing' || o.status === 'Shipped').reverse();
+          const rejected = allOrders.filter(o => o.status === 'Cancelled').reverse();
+          const completed = allOrders.filter(o => o.status === 'Completed' || o.status === 'Paid').reverse();
           
           setUnpaidOrders(unpaid);
-          setPaidOrders(paid);
+          setWaitingOrders(waiting);
+          setShippingOrders(shipping);
+          setRejectedOrders(rejected);
+          setCompletedOrders(completed);
         }
       } catch (error) {
         console.error("Failed to fetch orders:", error);
       } finally {
-        setLoading(false);
+        if (!isPolling) setLoading(false);
       }
     };
+
     fetchOrders();
-  }, []);
+    const interval = setInterval(() => fetchOrders(true), 5000);
+    return () => clearInterval(interval);
+  }, []); // Kosongkan dependency array agar tidak loop
 
   const handleViewInvoice = (orderId) => {
     navigate(`/invoice/${orderId}`);
   };
 
-  const currentOrders = activeTab === 'unpaid' ? unpaidOrders : paidOrders;
+  const currentOrders = 
+    activeTab === 'unpaid' ? unpaidOrders : 
+    activeTab === 'waiting' ? waitingOrders : 
+    activeTab === 'shipping' ? shippingOrders : 
+    activeTab === 'rejected' ? rejectedOrders : completedOrders;
 
   return (
     <div className="container" style={{ paddingTop: '100px', paddingBottom: '50px', minHeight: '80vh', position: 'relative', zIndex: 10 }}>
@@ -48,37 +87,32 @@ export default function UserOrders() {
       </p>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '30px', background: 'rgba(255,255,255,0.05)', padding: '5px', borderRadius: '12px', width: 'fit-content' }}>
-        <button 
-          onClick={() => setActiveTab('unpaid')}
-          style={{ 
-            padding: '10px 25px', 
-            borderRadius: '8px', 
-            border: 'none', 
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            transition: 'all 0.3s',
-            background: activeTab === 'unpaid' ? 'var(--accent-crimson)' : 'transparent',
-            color: activeTab === 'unpaid' ? '#fff' : '#888'
-          }}
-        >
-          Belum Bayar ({unpaidOrders.length})
-        </button>
-        <button 
-          onClick={() => setActiveTab('paid')}
-          style={{ 
-            padding: '10px 25px', 
-            borderRadius: '8px', 
-            border: 'none', 
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            transition: 'all 0.3s',
-            background: activeTab === 'paid' ? 'var(--accent-crimson)' : 'transparent',
-            color: activeTab === 'paid' ? '#fff' : '#888'
-          }}
-        >
-          Sudah Bayar ({paidOrders.length})
-        </button>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '30px', background: 'rgba(255,255,255,0.05)', padding: '5px', borderRadius: '12px', width: 'fit-content', flexWrap: 'wrap' }}>
+        {[
+          { id: 'unpaid', label: 'Belum Bayar', count: unpaidOrders.length },
+          { id: 'waiting', label: 'Menunggu Konfirmasi', count: waitingOrders.length },
+          { id: 'shipping', label: 'Dikirim', count: shippingOrders.length },
+          { id: 'completed', label: 'Selesai', count: completedOrders.length },
+          { id: 'rejected', label: 'Ditolak', count: rejectedOrders.length },
+        ].map(tab => (
+          <button 
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{ 
+              padding: '10px 20px', 
+              borderRadius: '8px', 
+              border: 'none', 
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              transition: 'all 0.3s',
+              background: activeTab === tab.id ? 'var(--accent-crimson)' : 'transparent',
+              color: activeTab === tab.id ? '#fff' : '#888',
+              fontSize: '0.85rem'
+            }}
+          >
+            {tab.label} ({tab.count})
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -109,13 +143,27 @@ export default function UserOrders() {
                 </div>
                 <span style={{ 
                   padding: '4px 8px', 
-                  background: activeTab === 'unpaid' ? 'rgba(241, 196, 15, 0.1)' : 'rgba(46, 204, 113, 0.1)', 
-                  color: activeTab === 'unpaid' ? '#f39c12' : '#2ecc71', 
+                  background: 
+                    activeTab === 'unpaid' ? 'rgba(241, 196, 15, 0.1)' : 
+                    order.status === 'STOCK_CONFLICT' ? 'rgba(231, 76, 60, 0.1)' :
+                    activeTab === 'waiting' ? 'rgba(52, 152, 219, 0.1)' : 
+                    activeTab === 'rejected' ? 'rgba(231, 76, 60, 0.1)' : 
+                    'rgba(46, 204, 113, 0.1)', 
+                  color: 
+                    activeTab === 'unpaid' ? '#f39c12' : 
+                    order.status === 'STOCK_CONFLICT' ? '#e74c3c' :
+                    activeTab === 'waiting' ? '#3498db' : 
+                    activeTab === 'rejected' ? '#e74c3c' : 
+                    '#2ecc71', 
                   borderRadius: '4px', 
                   fontSize: '0.7rem', 
                   fontWeight: 'bold' 
                 }}>
-                  {activeTab === 'unpaid' ? 'BELUM BAYAR' : order.status.toUpperCase()}
+                  {activeTab === 'unpaid' ? 'BELUM BAYAR' : 
+                   order.status === 'STOCK_CONFLICT' ? 'KONFLIK STOK ⚠️' :
+                   activeTab === 'waiting' ? 'MENUNGGU KONFIRMASI' : 
+                   activeTab === 'rejected' ? 'DITOLAK' : 
+                   order.status.toUpperCase()}
                 </span>
               </div>
               
@@ -151,6 +199,12 @@ export default function UserOrders() {
               >
                 {activeTab === 'unpaid' ? (
                   <> <CreditCard size={18} /> Bayar Sekarang <ArrowRight size={18} /> </>
+                ) : order.status === 'STOCK_CONFLICT' ? (
+                  <> <Package size={18} /> Resolusi Konflik Stok </>
+                ) : activeTab === 'waiting' ? (
+                  <> <Package size={18} /> Lihat Bukti & Detail </>
+                ) : activeTab === 'rejected' ? (
+                  <> <Package size={18} /> Lihat Detail Pembatalan </>
                 ) : (
                   <> <Package size={18} /> Detail & Lacak Paket </>
                 )}

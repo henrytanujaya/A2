@@ -5,11 +5,26 @@ import { useCart } from '../contexts/CartContext';
 import { useModal } from '../contexts/ModalContext';
 import axiosInstance from '../api/axiosInstance';
 import { Canvas, useLoader } from '@react-three/fiber';
-import { OrbitControls, Environment, ContactShadows, Html, Center, Float } from '@react-three/drei';
+import { OrbitControls, Environment, ContactShadows, Html, Center, Float, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { removeBackground } from '@imgly/background-removal';
 
-function ActionFigureModel({ imageUrl }) {
+function ActionFigureModel({ imageUrl, glbUrl }) {
+  // Jika ada GLB dari AI, gunakan model 3D nyata
+  if (glbUrl) {
+    const { scene } = useGLTF(glbUrl);
+    return (
+      <primitive 
+        object={scene} 
+        scale={4} 
+        position={[0, -1, 0]} 
+        castShadow 
+        receiveShadow 
+      />
+    );
+  }
+
+  // Fallback: Acrylic Standee (Plane)
   const texture = useLoader(THREE.TextureLoader, imageUrl);
   if (texture) {
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -22,7 +37,6 @@ function ActionFigureModel({ imageUrl }) {
   return (
     <group position={[0, height / 2 - 0.5, 0]}>
       <Float speed={2} rotationIntensity={0.1} floatIntensity={0.2}>
-        {/* Plane mesh mimicking an acrylic cutout standee */}
         <mesh castShadow receiveShadow>
           <planeGeometry args={[width, height]} />
           <meshStandardMaterial 
@@ -35,7 +49,6 @@ function ActionFigureModel({ imageUrl }) {
           />
         </mesh>
         
-        {/* Base Stand */}
         <mesh position={[0, -height / 2 - 0.1, 0]} receiveShadow castShadow>
           <cylinderGeometry args={[Math.max(width/1.2, 2.5), Math.max(width/1.2, 2.5), 0.2, 32]} />
           <meshStandardMaterial color="#1a1a1a" roughness={0.7} metalness={0.8} />
@@ -58,9 +71,18 @@ function Loader() {
 export default function Custom3D() {
   const [fileUrl, setFileUrl] = useState(null); // Preview
   const [fileBlob, setFileBlob] = useState(null); // Actual file for upload
+  const [glbUrl, setGlbUrl] = useState(null);   // GLB file from Tripo AI
   const [isProcessing, setIsProcessing] = useState(false);
+  const [aiStatus, setAiStatus] = useState(null); // 'uploading' | 'generating' | 'success'
+  const [progress, setProgress] = useState(0);
+  const [quantity, setQuantity] = useState(1);
   const { addToCart } = useCart();
   const { showModal } = useModal();
+
+  const handleQtyChange = (val) => {
+    const qty = Math.max(1, parseInt(val) || 1);
+    setQuantity(qty);
+  };
 
   const handleAddToCart = async () => {
     const token = localStorage.getItem('accessToken');
@@ -71,25 +93,15 @@ export default function Custom3D() {
 
     setIsProcessing(true);
     try {
-      let uploadedImageUrl = null;
-
-      // 1. Upload ke Cloudinary
-      if (fileBlob) {
-        const formData = new FormData();
-        formData.append('file', fileBlob);
-        const uploadRes = await axiosInstance.post('/api/v1/upload/figure-reference', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        uploadedImageUrl = uploadRes.data.data.imageUrl;
-      }
-
-      // 2. Simpan sebagai Custom Order
+      // 1. Simpan sebagai Custom Order
       const customOrderReq = {
-        serviceType: "3D Figure",
-        imageReferenceUrl: uploadedImageUrl,
+        serviceType: "3D Figure (AI Mesh)",
+        imageReferenceUrl: fileUrl, // Original image
+        previewImageUrl: fileUrl,    // Thumbnail
         price: 350000,
         configurationJson: JSON.stringify({
-          type: "AI Generated 3D Standee",
+          type: "AI Generated 3D Mesh",
+          glbUrl: glbUrl,
           originalFileName: fileBlob?.name
         })
       };
@@ -97,15 +109,17 @@ export default function Custom3D() {
       const customOrderRes = await axiosInstance.post('/api/v1/custom-orders', customOrderReq);
       const customOrderId = customOrderRes.data.data.id;
 
-      // 3. Tambah ke Keranjang
+      // 2. Tambah ke Keranjang
       await addToCart({
         customOrderId: customOrderId,
         name: "Custom 3D Action Figure (AI Generated)",
         price: 350000,
-        image: uploadedImageUrl,
-        details: "Tipe: True 3D Custom Figure\nModel: Akrilik Cutout Standee\nFitur: Auto Background Removal",
-        quantity: 1
+        image: fileUrl,
+        details: `Tipe: True 3D AI Mesh\nStatus: ${glbUrl ? 'Model Siap' : 'Pending'}\nFormat: GLB`,
+        quantity: quantity
       });
+
+      showModal("Pesanan 3D berhasil dimasukkan ke keranjang!", "success");
 
     } catch (error) {
       console.error("Gagal memproses custom order figure:", error);
@@ -115,22 +129,79 @@ export default function Custom3D() {
     }
   };
 
+  const startTripoAi = async (imageUrl) => {
+    setAiStatus('generating');
+    setProgress(10);
+    try {
+      const genRes = await axiosInstance.post('/api/v1/tripo/generate', { imageUrl });
+      const taskId = genRes.data.data;
+      
+      // Polling
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusRes = await axiosInstance.get(`/api/v1/tripo/status/${taskId}`);
+          const data = statusRes.data.data;
+          
+          if (data.status === 'success') {
+            clearInterval(pollInterval);
+            setGlbUrl(data.output.model);
+            setAiStatus('success');
+            setProgress(100);
+          } else if (data.status === 'failed') {
+            clearInterval(pollInterval);
+            setAiStatus(null);
+            showModal("AI gagal membuat model 3D. Menggunakan mode Acrylic Standee (2D).", "info");
+          } else {
+            // Update progress based on status (Tripo status is usually 'running' or 'pending')
+            setProgress(prev => Math.min(prev + 5, 95));
+          }
+        } catch (err) {
+          console.error("Polling error:", err);
+          clearInterval(pollInterval);
+          setAiStatus(null);
+        }
+      }, 3000);
+
+    } catch (error) {
+      console.error("Tripo start error:", error);
+      setAiStatus(null);
+      
+      // Deteksi error kredit habis (403)
+      if (error.response?.status === 403 || error.response?.data?.message?.includes('credit')) {
+        showModal("Kredit AI Tripo sedang habis. Desain tetap bisa dipesan dalam mode 'Acrylic Standee' (Flat 3D).", "info");
+      } else {
+        showModal("Gagal menghubungi mesin AI. Menggunakan mode standar.", "info");
+      }
+    }
+  };
+
   const onDrop = React.useCallback(async acceptedFiles => {
     if (acceptedFiles && acceptedFiles.length > 0) {
       const file = acceptedFiles[0];
       
       setIsProcessing(true);
+      setAiStatus('uploading');
       try {
-        // Run AI Background removal
+        // 1. Remove background
         const imageBlob = await removeBackground(file);
-        const url = URL.createObjectURL(imageBlob);
-        setFileUrl(url);
+        const previewUrl = URL.createObjectURL(imageBlob);
+        setFileUrl(previewUrl);
         setFileBlob(imageBlob);
+
+        // 2. Upload to Cloudinary (needed for Tripo URL)
+        const formData = new FormData();
+        formData.append('file', imageBlob);
+        const uploadRes = await axiosInstance.post('/api/v1/upload/figure-reference', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        const cloudUrl = uploadRes.data.data.imageUrl;
+
+        // 3. Start Tripo AI
+        await startTripoAi(cloudUrl);
+
       } catch (error) {
-        console.error("Gagal menghapus background:", error);
-        // Fallback or warning can be added here
-        setFileUrl(URL.createObjectURL(file));
-        setFileBlob(file);
+        console.error("Gagal memproses gambar:", error);
+        showModal("Gagal memproses foto. Silakan coba lagi.", "error");
       } finally {
         setIsProcessing(false);
       }
@@ -189,12 +260,23 @@ export default function Custom3D() {
             </div>
           )}
 
-          {isProcessing && (
+          {aiStatus === 'uploading' && (
             <div style={{ background: 'rgba(0,0,0,0.3)', padding: '40px 20px', borderRadius: '10px', border: '1px solid #444', textAlign: 'center' }}>
               <Loader2 size={40} color="#ff2a5f" style={{ margin: '0 auto 15px', animation: 'spin 2s linear infinite' }} />
-              <h3 style={{ color: '#fff', fontSize: '1.1rem' }}>Menganalisis Objek...</h3>
-              <p style={{ color: '#aaa', fontSize: '0.9rem', marginTop: '10px' }}>
-                AI sedang mengekstrak subjek tunggal dari background untuk dijadikan model 3D (dapat memakan waktu).
+              <h3 style={{ color: '#fff', fontSize: '1.1rem' }}>Mengunggah...</h3>
+            </div>
+          )}
+
+          {aiStatus === 'generating' && (
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '40px 20px', borderRadius: '10px', border: '1px solid #444', textAlign: 'center' }}>
+              <div style={{ position: 'relative', width: '60px', height: '60px', margin: '0 auto 15px' }}>
+                <div style={{ position: 'absolute', width: '100%', height: '100%', border: '4px solid rgba(255,42,95,0.1)', borderRadius: '50%' }}></div>
+                <div style={{ position: 'absolute', width: '100%', height: '100%', border: '4px solid #ff2a5f', borderRadius: '50%', borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }}></div>
+                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontWeight: 'bold', color: '#ff2a5f', fontSize: '0.8rem' }}>{progress}%</div>
+              </div>
+              <h3 style={{ color: '#fff', fontSize: '1.1rem' }}>AI Sedang Memahat...</h3>
+              <p style={{ color: '#aaa', fontSize: '0.8rem', marginTop: '10px' }}>
+                Ini memakan waktu ~30-60 detik untuk menciptakan volume 3D dari foto Anda.
               </p>
             </div>
           )}
@@ -229,9 +311,27 @@ export default function Custom3D() {
             </p>
           </div>
           
-          <div style={{ marginTop: '20px', background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-            <div style={{ color: 'var(--text-muted)', marginBottom: '10px', fontSize: '0.9rem' }}>Berdasarkan material True 3D & cetak</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--accent-crimson)' }}>Rp 350.000</div>
+          <div style={{ marginTop: '20px', background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Harga Per Unit</span>
+              <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--accent-crimson)' }}>Rp 350.000</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid #444', padding: '5px' }}>
+              <button 
+                onClick={() => handleQtyChange(quantity - 1)}
+                style={{ flex: 1, padding: '8px', background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '1.2rem' }}
+              >-</button>
+              <input 
+                type="number" 
+                value={quantity}
+                onChange={(e) => handleQtyChange(e.target.value)}
+                style={{ width: '50px', textAlign: 'center', background: 'none', border: 'none', color: '#fff', fontSize: '1.1rem', fontWeight: 'bold' }}
+              />
+              <button 
+                onClick={() => handleQtyChange(quantity + 1)}
+                style={{ flex: 1, padding: '8px', background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '1.2rem' }}
+              >+</button>
+            </div>
           </div>
           
           <button 
@@ -266,7 +366,7 @@ export default function Custom3D() {
               
               <Suspense fallback={<Loader />}>
                 <Center>
-                  <ActionFigureModel imageUrl={fileUrl} />
+                  <ActionFigureModel imageUrl={fileUrl} glbUrl={glbUrl} />
                 </Center>
                 <Environment preset="city" />
                 <ContactShadows position={[0, -3.5, 0]} opacity={0.5} scale={20} blur={2} far={10} />
