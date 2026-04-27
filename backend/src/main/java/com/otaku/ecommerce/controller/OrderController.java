@@ -48,6 +48,19 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success("OTK-2023", "Semua data order berhasil diambil", orders));
     }
 
+    @GetMapping("/paged")
+    @PreAuthorize("hasRole('Admin')")
+    public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<OrderResponseDTO>>> getPagedOrders(
+            @RequestParam(defaultValue = "all") String tab,
+            @RequestParam(defaultValue = "id") String type,
+            @RequestParam(required = false) String term,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        org.springframework.data.domain.Page<OrderResponseDTO> orders = orderService.getPagedOrders(tab, type, term, page, size);
+        return ResponseEntity.ok(ApiResponse.success("OTK-2025", "Data order paged berhasil diambil", orders));
+    }
+
     // ─── Get Order by ID (dengan ownership check — IDOR protection) ──────────
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('Admin') or @orderSecurity.isOrderOwner(#id, authentication.name)")

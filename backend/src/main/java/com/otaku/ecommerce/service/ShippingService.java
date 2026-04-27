@@ -5,7 +5,6 @@ import com.otaku.ecommerce.dto.ShippingRateDTO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +32,10 @@ public class ShippingService {
     public ShippingAreaDTO searchAreas(String query) {
         ShippingAreaDTO result = new ShippingAreaDTO();
         result.setSuccess(true);
+
+        if (query == null || query.isBlank()) {
+            return result;
+        }
 
         // {id, kecamatan, kota, provinsi, kode_pos}
         String[][] areaData = {
@@ -92,14 +95,14 @@ public class ShippingService {
             if (d[1].toLowerCase().contains(q)
                     || d[2].toLowerCase().contains(q)
                     || d[3].toLowerCase().contains(q)) {
-                ShippingAreaDTO.Area area = new ShippingAreaDTO.Area();
-                area.setId(d[0]);
-                area.setName(fullName);
-                area.setDistrict(d[1]);
-                area.setCity(d[2]);
-                area.setProvince(d[3]);
-                area.setPostalCode(d[4]);
-                areas.add(area);
+                ShippingAreaDTO.Area a = new ShippingAreaDTO.Area();
+                a.setId(d[0]);
+                a.setDistrict(d[1]);
+                a.setCity(d[2]);
+                a.setProvince(d[3]);
+                a.setPostalCode(d[4]);
+                a.setName(fullName);
+                areas.add(a);
             }
         }
 

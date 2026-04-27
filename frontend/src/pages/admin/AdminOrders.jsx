@@ -71,6 +71,7 @@ export default function AdminOrders() {
     }
   };
 
+<<<<<<< Updated upstream
   const handleCancelOrder = async (orderId) => {
     if (!window.confirm("Apakah Anda yakin ingin membatalkan pesanan ini?")) return;
     try {
@@ -87,6 +88,8 @@ export default function AdminOrders() {
     }
   };
 
+=======
+>>>>>>> Stashed changes
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
       order.orderId.toString().includes(searchTerm) ||
@@ -212,6 +215,7 @@ export default function AdminOrders() {
                       </span>
                     </td>
                     <td style={{ padding: '15px 20px' }}>
+<<<<<<< Updated upstream
                       {(order.status === 'Waiting_Verification' || order.status === 'Pending') ? (
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button 
@@ -228,6 +232,15 @@ export default function AdminOrders() {
                             Batal
                           </button>
                         </div>
+=======
+                      {order.status === 'Waiting_Verification' ? (
+                        <button 
+                          onClick={() => handleValidatePayment(order.orderId)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 15px', background: '#2ecc71', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
+                        >
+                          <CheckCircle size={16} /> Validasi Pembayaran
+                        </button>
+>>>>>>> Stashed changes
                       ) : order.status === 'Processing' && !order.trackingNumber ? (
                         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                           <input 

@@ -184,6 +184,14 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
+    public org.springframework.data.domain.Page<OrderResponseDTO> getPagedOrders(String tab, String type, String term, int page, int size) {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                page, size, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt")
+        );
+        return orderRepository.findFilteredOrders(tab, type, term, pageable)
+                .map(o -> buildResponse(o, o.getDiscount()));
+    }
+
     // ─── Update Status Order (Admin, dengan validasi transisi) ───────────────
     @Transactional
     public void updateOrderStatus(Integer orderId, String newStatus) {

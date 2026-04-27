@@ -174,8 +174,13 @@ export default function Checkout() {
         customer: { name: formData.name, email: formData.email, address: fullAddress },
         items: [...cart],
         summary: { subtotal, ppn, shipping: shippingFee, total: grandTotal },
+<<<<<<< Updated upstream
         paymentMethod: 'Xendit (VA, E-Wallet, Retail)',
         courier: `${formData.courier.toUpperCase()} - ${selectedOption.serviceName}`,
+=======
+        paymentMethod: 'Bank Transfer',
+        courier: `${formData.courier.toUpperCase()} - ${selectedOption.service}`,
+>>>>>>> Stashed changes
         status: 'UNPAID',
         paymentUrl: paymentData.paymentUrl
       };

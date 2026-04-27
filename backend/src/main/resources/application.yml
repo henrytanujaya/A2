@@ -81,22 +81,22 @@ storage:
 
 # ─── BinderByte Tracking API (untuk TrackingService) ────────────────────────
 binderbyte:
-  api-key: ${BINDERBYTE_API_KEY}
+  api-key: ${BINDERBYTE_API_KEY:ce8138be2864572d8049d35839fe1cf66a26faf74a5859c96a0cd57d678c2c6d}
   base-url: https://api.binderbyte.com/v1
   origin: ${SHIPPING_ORIGIN:jakarta utara}
 
 # ─── Xendit Payment Gateway ─────────────────────────────────────────────────
 xendit:
-  secret-key: ${XENDIT_SECRET_KEY}
-  callback-token: ${XENDIT_CALLBACK_TOKEN}
+  secret-key: ${XENDIT_SECRET_KEY:}
+  callback-token: ${XENDIT_CALLBACK_TOKEN:}
 
 # ─── Cloudinary Media Storage ───────────────────────────────────────────────
 cloudinary:
-  cloud-name: ${CLOUDINARY_CLOUD_NAME}
-  api-key: ${CLOUDINARY_API_KEY}
-  api-secret: ${CLOUDINARY_API_SECRET}
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:}
+  api-key: ${CLOUDINARY_API_KEY:}
+  api-secret: ${CLOUDINARY_API_SECRET:}
   upload-preset: ${CLOUDINARY_UPLOAD_PRESET:otaku_ecommerce}
 
 # ─── Tripo AI 3D Engine ─────────────────────────────────────────────────────
 tripo:
-  api-key: ${TRIPO_AI_API_KEY}
+  api-key: ${TRIPO_AI_API_KEY:}
