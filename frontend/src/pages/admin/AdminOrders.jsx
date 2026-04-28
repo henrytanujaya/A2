@@ -18,6 +18,12 @@ export default function AdminOrders() {
 
   const { showModal } = useModal();
 
+  const searchTypeOptions = [
+    { value: 'id', label: 'ID Pesanan' },
+    { value: 'tracking', label: 'Nomor Resi' },
+    { value: 'status', label: 'Status' }
+  ];
+
   // State for tracking input
   const [editTracking, setEditTracking] = useState({});
 
@@ -90,17 +96,21 @@ export default function AdminOrders() {
     }
   };
 
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch =
-      order.orderId.toString().includes(searchTerm) ||
-      (order.customer?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
-
-    if (activeTab === 'perlu_resi') {
-      return matchesSearch && order.status === 'Processing' && (!order.trackingNumber || order.trackingNumber === 'null' || order.trackingNumber === '');
+  const handleCancelOrder = async (orderId) => {
+    if (!window.confirm("Apakah Anda yakin ingin membatalkan pesanan ini?")) return;
+    try {
+      await axiosInstance.patch(`/api/v1/orders/${orderId}/status`, null, {
+        params: {
+          status: 'Cancelled'
+        }
+      });
+      showModal("Pesanan berhasil dibatalkan.", "success");
+      fetchOrders();
+    } catch (error) {
+      console.error("Cancel order error:", error);
+      showModal("Gagal membatalkan pesanan.", "error");
     }
-    if (activeTab === 'all') return matchesSearch;
-    return matchesSearch && order.status.toLowerCase() === activeTab.toLowerCase();
-  });
+  };
 
   return (
     <div style={{ padding: '20px' }} onClick={() => setShowDropdown(false)}>
