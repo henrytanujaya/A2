@@ -7,7 +7,7 @@ export default function Footer() {
       <div className="container footer-content" style={{ justifyContent: 'center', gap: '10vw' }}>
         <div className="footer-column">
           <h4 className="brand-font" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <img src="/src/assets/logo.png" alt="Logo" style={{ width: '30px', height: '30px', objectFit: 'contain' }}/> KITSUNE NOIR
+            <img src="/logo.png" alt="Logo" style={{ width: '30px', height: '30px', objectFit: 'contain' }}/> KITSUNE NOIR
           </h4>
           <p style={{ color: 'var(--text-muted)', maxWidth: '300px', lineHeight: '1.6' }}>
             Platform premium E-Commerce manga dan merchandise otaku bernuansa Matsuri mistis.

@@ -58,7 +58,7 @@ export default function AdminLayout({ setIsLoggedIn }) {
         zIndex: 20
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '40px', gap: '10px' }}>
-          <img src="/src/assets/logo.png" alt="Logo" style={{ width: '40px', height: '40px' }} />
+          <img src="/logo.png" alt="Logo" style={{ width: '40px', height: '40px' }} />
           <h2 className="brand-font" style={{ fontSize: '1.2rem', margin: 0, color: '#dc143c' }}>ADMIN PANEL</h2>
         </div>
 

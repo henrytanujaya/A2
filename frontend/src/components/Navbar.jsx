@@ -28,7 +28,7 @@ export default function Navbar({ isLoggedIn, setIsLoggedIn }) {
     <nav className="navbar">
       <div className="container nav-container">
         <Link to="/" className="brand-logo" style={{ textDecoration: 'none' }}>
-          <img src="/src/assets/logo.png" alt="Kitsune Noir Logo" style={{ width: '45px', height: '45px', objectFit: 'contain' }} />
+          <img src="/logo.png" alt="Kitsune Noir Logo" style={{ width: '45px', height: '45px', objectFit: 'contain' }} />
           <span className="brand-font">KITSUNE <br/> NOIR</span>
         </Link>
         <div className="nav-links">

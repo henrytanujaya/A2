@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # ─── Database SQL Server ───────────────────────────────────────────────────
+  database:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: otaku-mssql
+    environment:
+      ACCEPT_EULA: 'Y'
+      MSSQL_SA_PASSWORD: 'password123!' # Password harus cukup kuat untuk MSSQL
+    ports:
+      - "1434:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+
+  # ─── Redis Cache & Session ─────────────────────────────────────────────────
+  redis-session:
+    image: redis:7-alpine
+    container_name: otaku-redis
+    ports:
+      - "6380:6379"
+
+  # ─── Backend API (Spring Boot) ─────────────────────────────────────────────
+  backend-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: otaku-backend
+    ports:
+      - "8321:8321"
+    environment:
+      # Koneksi ke DB menggunakan nama container 'database'
+      - DB_URL=jdbc:sqlserver://database:1433;databaseName=OtakuECommerce;encrypt=true;trustServerCertificate=true
+      - DB_USERNAME=sa
+      - DB_PASSWORD=password123!
+      # Koneksi Redis
+      - REDIS_HOST=redis-session
+      - REDIS_PORT=6379
+      # Kredensial lain sebaiknya dilempar lewat .env, tapi kita set default di sini
+      - SERVER_PORT=8321
+    depends_on:
+      - database
+      - redis-session
+
+  # ─── Frontend Web (React + Nginx) ──────────────────────────────────────────
+  frontend-web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=
+    container_name: otaku-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend-api
+
+volumes:
+  mssql_data:

@@ -109,7 +109,7 @@ export default function Login({ setIsLoggedIn }) {
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '15px' }}>
-          <img src="/src/assets/logo.png" alt="Kitsune Noir Logo" style={{ width: '80px', height: '80px', objectFit: 'contain', marginBottom: '5px' }} />
+          <img src="/logo.png" alt="Kitsune Noir Logo" style={{ width: '80px', height: '80px', objectFit: 'contain', marginBottom: '5px' }} />
           <span className="brand-font" style={{ fontSize: '1.8rem', textAlign: 'center', color: '#fff' }}>KITSUNE NOIR</span>
         </div>
         <h2 style={{ textAlign: 'center', marginBottom: '30px', fontSize: '1.2rem', color: '#dc143c', fontWeight: '500' }}>Login to your account</h2>
