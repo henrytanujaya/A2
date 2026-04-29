@@ -6,4 +6,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface PaymentLogRepository extends JpaRepository<PaymentLog, Integer> {
+    java.util.Optional<PaymentLog> findTopByOrderIdOrderByIdDesc(Integer orderId);
 }

@@ -43,6 +43,7 @@ public class OrderService {
     @Autowired private CustomOrderRepository  customOrderRepository;
     @Autowired private DiscountRepository     discountRepository;
     @Autowired private OrderTrackingRepository orderTrackingRepository;
+    @Autowired private PaymentLogRepository    paymentLogRepository;
 
     // ─── Create Order (dari email JWT, bukan userId dari body) ────────────────
     @SuppressWarnings("null")
@@ -233,6 +234,7 @@ public class OrderService {
     }
 
     @Transactional
+    @SuppressWarnings("null")
     public boolean validateAndReduceStock(Integer orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new CustomBusinessException("OTK-4042", "Order tidak ditemukan", 404));
@@ -251,6 +253,7 @@ public class OrderService {
     }
     
     @Transactional
+    @SuppressWarnings("null")
     public void generateAutoTracking(Integer orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new CustomBusinessException("OTK-4042", "Order tidak ditemukan", 404));
@@ -320,6 +323,24 @@ public class OrderService {
         dto.setTrackingNumber(order.getTrackingNumber());
         dto.setPaymentUrl(order.getPaymentUrl());
         dto.setPaymentInvoiceId(order.getPaymentInvoiceId());
+        dto.setPaymentStatus(order.getPaymentStatus());
+
+        // Cari Payment Method dari log terakhir
+        paymentLogRepository.findTopByOrderIdOrderByIdDesc(order.getId())
+            .ifPresent(log -> {
+                try {
+                    // Coba ambil payment_method dari raw payload JSON jika ada
+                    Map<String, Object> payload = new com.fasterxml.jackson.databind.ObjectMapper()
+                            .readValue(log.getRawPayload(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+                    if (payload.containsKey("payment_method")) {
+                        dto.setPaymentMethod(String.valueOf(payload.get("payment_method")));
+                    } else if (payload.containsKey("payment_channel")) {
+                        dto.setPaymentMethod(String.valueOf(payload.get("payment_channel")));
+                    }
+                } catch (Exception e) {
+                    dto.setPaymentMethod(log.getStatus()); // Fallback
+                }
+            });
         
         List<OrderItemResponseDTO> itemDTOs = order.getItems().stream().map(item -> {
             OrderItemResponseDTO idto = new OrderItemResponseDTO();

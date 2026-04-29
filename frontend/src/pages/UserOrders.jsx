@@ -65,7 +65,7 @@ export default function UserOrders() {
     };
 
     fetchOrders();
-    const interval = setInterval(() => fetchOrders(true), 5000);
+    const interval = setInterval(() => fetchOrders(true), 30000);
     return () => clearInterval(interval);
   }, []); // Kosongkan dependency array agar tidak loop
 
@@ -157,12 +157,17 @@ export default function UserOrders() {
                     '#2ecc71', 
                   borderRadius: '4px', 
                   fontSize: '0.7rem', 
-                  fontWeight: 'bold' 
+                  fontWeight: 'bold',
+                  textAlign: 'center'
                 }}>
                   {activeTab === 'unpaid' ? 'BELUM BAYAR' : 
                    order.status === 'STOCK_CONFLICT' ? 'KONFLIK STOK ⚠️' :
                    activeTab === 'waiting' ? 'MENUNGGU KONFIRMASI' : 
-                   activeTab === 'rejected' ? 'DITOLAK' : 
+                   activeTab === 'rejected' ? (
+                     order.trackingHistory?.some(h => h.description?.includes("Waktu pembayaran")) 
+                     ? 'TIMEOUT: WAKTU PEMBAYARAN MELEBIHI BATAS' 
+                     : 'DITOLAK'
+                   ) : 
                    order.status.toUpperCase()}
                 </span>
               </div>
@@ -205,10 +210,13 @@ export default function UserOrders() {
                   <> <Package size={18} /> Lihat Bukti & Detail </>
                 ) : activeTab === 'rejected' ? (
                   <> <Package size={18} /> Lihat Detail Pembatalan </>
+                ) : activeTab === 'completed' ? (
+                  <> <Package size={18} /> Detail Pesanan </>
                 ) : (
                   <> <Package size={18} /> Detail & Lacak Paket </>
                 )}
               </button>
+
             </motion.div>
           ))}
         </div>

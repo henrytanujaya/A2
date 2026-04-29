@@ -69,16 +69,34 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success("OTK-2022", "Detail order berhasil diambil", response));
     }
 
-    // ─── Update Order Status & Tracking (Admin) ───────────────────────────────
+    // ─── Update Order Status & Tracking (Admin & Customer) ───────────────────
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasRole('Admin') or (@orderSecurity.isOrderOwner(#id, authentication.name) and #status == 'Waiting_Verification')")
+    @PreAuthorize("hasRole('Admin') or @orderSecurity.isOrderOwner(#id, authentication.name)")
     public ResponseEntity<ApiResponse<Void>> updateStatus(
             @PathVariable Integer id,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String courierCode,
-            @RequestParam(required = false) String trackingNumber) {
+            @RequestParam(required = false) String trackingNumber,
+            @RequestBody(required = false) java.util.Map<String, String> body) {
 
-        orderService.updateOrderDetails(id, status, courierCode, trackingNumber);
+        String finalStatus = status;
+        if (finalStatus == null && body != null) {
+            finalStatus = body.get("status");
+        }
+
+        // Security: Jika bukan Admin, hanya boleh update ke status tertentu
+        // (OrderService juga memvalidasi transisi status)
+        boolean isAdmin = org.springframework.security.core.context.SecurityContextHolder.getContext()
+                .getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_Admin"));
+
+        if (!isAdmin && finalStatus != null) {
+            if (!finalStatus.equals("Waiting_Verification")) {
+                return ResponseEntity.status(403).body(ApiResponse.error("OTK-4030", "Anda tidak memiliki izin untuk mengubah status ke " + finalStatus));
+            }
+        }
+
+        orderService.updateOrderDetails(id, finalStatus, courierCode, trackingNumber);
         return ResponseEntity.ok(ApiResponse.success("OTK-2024", "Status order berhasil diperbarui", null));
     }
 }

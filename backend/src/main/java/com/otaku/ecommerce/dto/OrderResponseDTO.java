@@ -18,6 +18,8 @@ public class OrderResponseDTO {
     private String trackingNumber;
     private String paymentUrl;
     private String paymentInvoiceId;
+    private String paymentStatus;
+    private String paymentMethod;
     private List<OrderItemResponseDTO> items;
     private List<OrderTrackingDTO> trackingHistory;
 
@@ -47,6 +49,10 @@ public class OrderResponseDTO {
     public void setPaymentUrl(String paymentUrl) { this.paymentUrl = paymentUrl; }
     public String getPaymentInvoiceId() { return paymentInvoiceId; }
     public void setPaymentInvoiceId(String paymentInvoiceId) { this.paymentInvoiceId = paymentInvoiceId; }
+    public String getPaymentStatus() { return paymentStatus; }
+    public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
+    public String getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
     public List<OrderItemResponseDTO> getItems() { return items; }
     public void setItems(List<OrderItemResponseDTO> items) { this.items = items; }
     public List<OrderTrackingDTO> getTrackingHistory() { return trackingHistory; }

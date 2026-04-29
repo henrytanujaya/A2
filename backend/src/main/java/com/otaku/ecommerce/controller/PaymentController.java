@@ -23,7 +23,7 @@ public class PaymentController {
     @PostMapping("/token")
     @PreAuthorize("hasAnyRole('Customer', 'Admin')")
     public ResponseEntity<ApiResponse<PaymentResponseDTO>> createPaymentToken(
-            Authentication auth, 
+            Authentication auth,
             @RequestBody PaymentRequestDTO request) {
         PaymentResponseDTO response = paymentService.createPaymentToken(auth.getName(), request);
         return ResponseEntity.ok(ApiResponse.success("OTK-200", "Token pembayaran berhasil dibuat", response));
@@ -37,7 +37,7 @@ public class PaymentController {
     public ResponseEntity<ApiResponse<Void>> handleWebhook(
             @RequestHeader("x-callback-token") String callbackToken,
             @RequestBody Map<String, Object> payload) {
-        
+
         // Verifikasi token untuk keamanan
         if (xenditCallbackToken == null || !xenditCallbackToken.equals(callbackToken)) {
             return ResponseEntity.status(401).body(ApiResponse.error("OTK-401", "Unauthorized callback"));

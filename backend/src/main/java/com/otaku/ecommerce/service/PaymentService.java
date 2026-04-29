@@ -81,7 +81,7 @@ public class PaymentService {
             body.put("amount", order.getFinalAmount());
             body.put("payer_email", order.getUser().getEmail());
             body.put("description", "Pembayaran Otaku E-Commerce Order #" + order.getId());
-            
+
             // Tambahkan URL redirect
             body.put("success_redirect_url", "http://localhost:5173/my-orders");
             body.put("failure_redirect_url", "http://localhost:5173/my-orders");
@@ -112,15 +112,47 @@ public class PaymentService {
 
     @Transactional
     public void processXenditWebhook(Map<String, Object> payload) {
+        // 0. Awal pemrosesan dengan proteksi null
+        if (payload == null || payload.get("external_id") == null) {
+            System.out.println("Webhook Info: Payload kosong atau tidak memiliki external_id. Dilewati.");
+            return;
+        }
+
         String externalId = String.valueOf(payload.get("external_id"));
-        String status = String.valueOf(payload.get("status"));
-        BigDecimal amountPaid = new BigDecimal(String.valueOf(payload.get("amount")));
+        String status = payload.get("status") != null ? String.valueOf(payload.get("status")) : "UNKNOWN";
         
+        BigDecimal amountPaid = BigDecimal.ZERO;
+        try {
+            if (payload.get("amount") != null) {
+                amountPaid = new BigDecimal(String.valueOf(payload.get("amount")));
+            }
+        } catch (Exception e) {
+            System.out.println("Gagal parsing nominal: " + payload.get("amount"));
+        }
+        
+        System.out.println("Detail Pembayaran:");
+        System.out.println("- External ID: " + externalId);
+        System.out.println("- Status: " + status);
+        System.out.println("- Amount: " + amountPaid);
+
         // externalId format: "ORDER-123"
-        Integer orderId = Integer.parseInt(externalId.replace("ORDER-", ""));
+        Integer orderId;
+        try {
+            if (!externalId.startsWith("ORDER-")) {
+                System.out.println("Webhook Info: Menerima data non-order atau simulasi tes (" + externalId + "). Dilewati.");
+                return;
+            }
+            orderId = Integer.parseInt(externalId.replace("ORDER-", ""));
+        } catch (Exception e) {
+            System.err.println("Gagal memproses External ID: " + externalId);
+            return;
+        }
         
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new CustomBusinessException("OTK-4042", "Order tidak ditemukan", 404));
+                .orElseThrow(() -> {
+                    System.err.println("Order dengan ID " + orderId + " tidak ditemukan di database.");
+                    return new CustomBusinessException("OTK-4042", "Order tidak ditemukan", 404);
+                });
 
         // 1. Audit Logging
         try {
@@ -138,28 +170,31 @@ public class PaymentService {
 
         // 2. Fraud Check: Amount Validation
         if (amountPaid.compareTo(order.getFinalAmount()) != 0) {
-             throw new CustomBusinessException("OTK-FRAUD", "Nominal pembayaran tidak sesuai!", 400);
+            throw new CustomBusinessException("OTK-FRAUD", "Nominal pembayaran tidak sesuai!", 400);
         }
 
         // 3. Update Status
         if ("PAID".equalsIgnoreCase(status) || "SETTLED".equalsIgnoreCase(status)) {
             // Idempotency check
-            if (!"Shipped".equalsIgnoreCase(order.getStatus()) && !"Completed".equalsIgnoreCase(order.getStatus()) && !"STOCK_CONFLICT".equalsIgnoreCase(order.getStatus())) {
+            if (!"Shipped".equalsIgnoreCase(order.getStatus()) && !"Completed".equalsIgnoreCase(order.getStatus())
+                    && !"STOCK_CONFLICT".equalsIgnoreCase(order.getStatus())) {
                 order.setPaymentStatus("PAID");
                 orderRepository.save(order);
-                
+
                 // Cek Stok dan Kurangi secara atomik
                 boolean stockReduced = orderService.validateAndReduceStock(orderId);
-                
+
                 if (stockReduced) {
                     // Berhasil kurangi stok -> Lanjut ke Menunggu Konfirmasi
                     orderService.updateOrderStatus(orderId, "Waiting_Verification");
-                    orderService.addTrackingHistory(orderId, "Waiting_Verification", "Pembayaran terverifikasi & stok aman.");
+                    orderService.addTrackingHistory(orderId, "Waiting_Verification",
+                            "Pembayaran terverifikasi & stok aman.");
                 } else {
                     // GAGAL kurangi stok (Konflik) -> Set status khusus
                     order.setStatus("STOCK_CONFLICT");
                     orderRepository.save(order);
-                    orderService.addTrackingHistory(orderId, "STOCK_CONFLICT", "PERINGATAN: Pembayaran diterima namun stok tidak mencukupi saat proses verifikasi.");
+                    orderService.addTrackingHistory(orderId, "STOCK_CONFLICT",
+                            "PERINGATAN: Pembayaran diterima namun stok tidak mencukupi saat proses verifikasi.");
                 }
             }
         } else if ("EXPIRED".equalsIgnoreCase(status)) {
@@ -167,7 +202,7 @@ public class PaymentService {
             orderService.updateOrderStatus(orderId, "Cancelled");
             orderService.addTrackingHistory(orderId, "Cancelled", "Invoice Xendit kedaluwarsa");
         }
-        
+
         orderRepository.save(order);
     }
 }

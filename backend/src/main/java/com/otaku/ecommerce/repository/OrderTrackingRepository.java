@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface OrderTrackingRepository extends JpaRepository<OrderTracking, Integer> {
     List<OrderTracking> findByOrderIdOrderByCreatedAtDesc(Integer orderId);
+    java.util.Optional<OrderTracking> findTopByOrderIdOrderByCreatedAtDesc(Integer orderId);
 }
