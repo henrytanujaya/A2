@@ -81,8 +81,12 @@ storage:
 
 # ─── BinderByte Tracking API (untuk TrackingService) ────────────────────────
 binderbyte:
-  api-key: ${BINDERBYTE_API_KEY:ce8138be2864572d8049d35839fe1cf66a26faf74a5859c96a0cd57d678c2c6d}
+  api-key: ${BINDERBYTE_API_KEY:bf129bb787401c107fb77afc4b4a1b025a17688cbab51ab669a7c3cd1ce4db98}
   base-url: https://api.binderbyte.com/v1
+
+biteship:
+  api-key: biteship_test.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiZWNvbWVyY2VhbmltZSIsInVzZXJJZCI6IjY5ZWM2YTZlNmY2YTlkZWZlNzU3NTU5NCIsImlhdCI6MTc3NzEwMjk5N30.Dk9vXe05taBlEXHyKYvYYTvTDGPFbsk-69mK90MvG5A
+  base-url: https://api.biteship.com/v1
   origin: ${SHIPPING_ORIGIN:jakarta utara}
 
 # ─── Xendit Payment Gateway ─────────────────────────────────────────────────

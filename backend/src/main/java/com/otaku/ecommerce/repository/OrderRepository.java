@@ -19,7 +19,8 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     @org.springframework.data.jpa.repository.Query("SELECT o FROM Order o WHERE " +
         "(:tab = 'all' OR " +
         " (:tab = 'perlu_resi' AND o.status = 'Processing' AND (o.trackingNumber IS NULL OR o.trackingNumber = '')) OR " +
-        " (:tab != 'all' AND :tab != 'perlu_resi' AND LOWER(o.status) = LOWER(:tab)) ) " +
+        " (:tab = 'Cancelled' AND LOWER(o.status) IN ('cancelled', 'rejected', 'expired', 'timed_out')) OR " +
+        " (:tab != 'all' AND :tab != 'perlu_resi' AND :tab != 'Cancelled' AND LOWER(o.status) = LOWER(:tab)) ) " +
         "AND " +
         "(:term IS NULL OR :term = '' OR " +
         " (:type = 'id' AND CAST(o.id AS string) LIKE CONCAT('%', :term, '%')) OR " +
@@ -32,4 +33,18 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
         @org.springframework.data.repository.query.Param("term") String term,
         org.springframework.data.domain.Pageable pageable
     );
+
+    @org.springframework.data.jpa.repository.Query("SELECT o FROM Order o WHERE " +
+        "MONTH(o.createdAt) = :month AND " +
+        "YEAR(o.createdAt) = :year AND " +
+        "o.status IN ('Paid', 'Processing', 'Shipped', 'Completed')")
+    List<Order> findAuditOrders(
+        @org.springframework.data.repository.query.Param("month") int month,
+        @org.springframework.data.repository.query.Param("year") int year
+    );
+
+    @org.springframework.data.jpa.repository.Query("SELECT SUM(o.totalAmount) FROM Order o WHERE o.status IN ('Paid', 'Processing', 'Shipped', 'Completed')")
+    java.math.BigDecimal sumRevenue();
+
+    List<Order> findTop5ByOrderByCreatedAtDesc();
 }

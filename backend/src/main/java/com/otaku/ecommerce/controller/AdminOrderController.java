@@ -44,4 +44,10 @@ public class AdminOrderController {
         orderService.updateOrderStatus(id, newStatus);
         return ResponseEntity.ok(ApiResponse.success("OTK-2023", "Status order berhasil diperbarui", null));
     }
+
+    @PostMapping("/{id}/automate-shipping")
+    public ResponseEntity<ApiResponse<OrderResponseDTO>> automateShipping(@PathVariable Integer id) {
+        OrderResponseDTO response = orderService.processAutomatedShipping(id);
+        return ResponseEntity.ok(ApiResponse.success("OTK-2025", "Otomasi pengiriman berhasil dijalankan", response));
+    }
 }

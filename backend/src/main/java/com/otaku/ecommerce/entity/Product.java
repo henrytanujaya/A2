@@ -40,6 +40,20 @@ public class Product {
     @Column(name = "Weight")
     private Integer weight = 500; // gram
 
+    @Column(name = "UpdatedAt")
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
     public String getCategory() { return category; }
@@ -60,5 +74,7 @@ public class Product {
     public void setRating(Integer rating) { this.rating = rating; }
     public Integer getWeight() { return weight; }
     public void setWeight(Integer weight) { this.weight = weight; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }
 

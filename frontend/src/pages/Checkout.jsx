@@ -6,8 +6,8 @@ import { useModal } from '../contexts/ModalContext';
 import { MapPin, CreditCard, User, Mail, Truck, Loader2, ChevronDown, CheckCircle } from 'lucide-react';
 import axiosInstance from '../api/axiosInstance';
 
-// Origin toko: Cilincing, Kalibaru, Jakarta Utara (ID Biteship)
-const SHOP_ORIGIN_ID = "IDNP6IDNC150IDND881IDZ14110";
+// Origin toko: Jakarta Utara
+const SHOP_ORIGIN = "jakarta utara";
 
 export default function Checkout() {
   const { cart, clearCart } = useCart();
@@ -181,7 +181,7 @@ export default function Checkout() {
       };
 
       showModal('Order berhasil dibuat! Mengalihkan ke daftar pesanan...', 'success', () => {
-        navigate('/my-orders');
+        navigate('/my-orders?tab=unpaid');
       });
 
     } catch (error) {

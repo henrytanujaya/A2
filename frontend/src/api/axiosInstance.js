@@ -132,7 +132,8 @@ function handleForceLogout(isAdmin = false) {
   }
 
   // Redirect ke login jika belum di halaman login
-  if (window.location.pathname !== '/login') {
+  const currentPath = window.location.pathname.replace(/\/$/, '');
+  if (currentPath !== '/login') {
     window.location.href = '/login';
   }
 }

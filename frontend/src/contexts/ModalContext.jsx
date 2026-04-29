@@ -68,7 +68,7 @@ export const ModalProvider = ({ children }) => {
               <h3 style={{ color: '#fff', fontSize: '1.8rem', margin: '0 0 10px 0' }}>
                 {config.type === 'success' ? 'Berhasil' : 'Perhatian'}
               </h3>
-              <p style={{ color: '#a0a0b0', margin: '0 0 30px 0', fontSize: '1.1rem', lineHeight: '1.5' }}>
+              <p style={{ color: '#a0a0b0', margin: '0 0 30px 0', fontSize: '1.1rem', lineHeight: '1.5', whiteSpace: 'pre-line' }}>
                 {config.message}
               </p>
               <button 

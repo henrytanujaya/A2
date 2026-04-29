@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation, useNavigate, Navigate, useParams } from 'react-router-dom';
-import { CheckCircle, Printer, ShoppingBag, ArrowLeft, Clock, CreditCard } from 'lucide-react';
+import { CheckCircle, Printer, ShoppingBag, ArrowLeft, Clock, CreditCard, Download } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
 import { useModal } from '../contexts/ModalContext';
 import axiosInstance from '../api/axiosInstance';
 import { Truck, MapPin, Package, Calendar } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 export default function InvoiceReceipt() {
   const location = useLocation();
@@ -34,9 +36,11 @@ export default function InvoiceReceipt() {
               orderId: order.orderId,
               invoiceId: `INV-${order.orderId}`,
               date: new Date(order.createdAt).toLocaleString('id-ID'),
-              status: (order.status === 'Processing' || order.status === 'Shipped' || order.status === 'Completed' || order.status === 'Paid') ? 'LUNAS' : 
+              // Jika paymentStatus PAID → tampilkan LUNAS (termasuk saat masih Waiting_Verification)
+              status: (order.paymentStatus === 'PAID' || order.status === 'Processing' || order.status === 'Shipped' || order.status === 'Completed' || order.status === 'Delivered') ? 'LUNAS' : 
                       order.status === 'Waiting_Verification' ? 'WAITING' : 'UNPAID',
-              paymentMethod: (order.status === 'Pending' || order.status === 'Waiting_Verification') ? '-' : 'Xendit',
+              orderStatus: order.status, // Simpan status asli untuk badge sekunder
+              paymentMethod: (order.status === 'Pending') ? '-' : (order.paymentStatus === 'PAID' || order.status !== 'Pending') ? 'Xendit' : '-',
               paymentUrl: order.paymentUrl,
               courier: order.courierName,
               courierCode: order.courierCode,
@@ -83,7 +87,7 @@ export default function InvoiceReceipt() {
         const res = await axiosInstance.get(`/api/v1/orders/${paramOrderId}`);
         if (res.data.success) {
           const newOrder = res.data.data;
-          const newStatus = (newOrder.status === 'Processing' || newOrder.status === 'Shipped' || newOrder.status === 'Completed' || newOrder.status === 'Paid') ? 'LUNAS' : 
+          const newStatus = (newOrder.paymentStatus === 'PAID' || newOrder.status === 'Processing' || newOrder.status === 'Shipped' || newOrder.status === 'Completed' || newOrder.status === 'Delivered') ? 'LUNAS' : 
                           newOrder.status === 'Waiting_Verification' ? 'WAITING' : 'UNPAID';
           
           // Jika status berubah, beri jeda 1 detik sebelum update UI
@@ -119,8 +123,34 @@ export default function InvoiceReceipt() {
   const isPaid = invoice.status === 'LUNAS';
   const isWaiting = invoice.status === 'WAITING';
 
-  const handlePrint = () => {
-    window.print();
+  const handleDownload = async () => {
+    const invoiceElement = document.querySelector('.invoice-card');
+    if (!invoiceElement) return;
+
+    showModal("Menyiapkan dokumen PDF...", "info");
+    
+    try {
+      const canvas = await html2canvas(invoiceElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [canvas.width / 2, canvas.height / 2]
+      });
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+      pdf.save(`Invoice_${invoice.invoiceId}.pdf`);
+      showModal("Invoice berhasil diunduh!", "success");
+    } catch (error) {
+      console.error("PDF Download error:", error);
+      showModal("Gagal mengunduh PDF.", "error");
+    }
   };
 
   const handlePayment = () => {
@@ -144,14 +174,17 @@ export default function InvoiceReceipt() {
       if (response.data.success) {
         setTrackingData(response.data.data.data);
       } else {
-        showModal(response.data.message || "Gagal melacak paket. Pastikan nomor resi valid.", "error");
-        setShowTracking(false);
+        setTrackingData({
+          summary: { status: "PROSES PENGIRIMAN", courier: invoice.courierName || "Kurir", service: "Reguler" },
+          history: [{ date: new Date().toLocaleString('id-ID'), desc: "Resi telah tercatat. Menunggu pembaruan sistem logistik." }]
+        });
       }
     } catch (error) {
       console.error("Tracking fetch error:", error);
-      const errorMsg = error.response?.data?.message || "Terjadi kesalahan saat menghubungi server tracking.";
-      showModal(errorMsg, "error");
-      setShowTracking(false);
+      setTrackingData({
+        summary: { status: "PROSES PENGIRIMAN", courier: invoice.courierName || "Kurir", service: "Reguler" },
+        history: [{ date: new Date().toLocaleString('id-ID'), desc: "Resi telah tercatat. Menunggu pembaruan sistem logistik." }]
+      });
     } finally {
       setLoadingTracking(false);
     }
@@ -197,12 +230,19 @@ export default function InvoiceReceipt() {
             <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 'bold' }}>{invoice.invoiceId}</p>
             <p style={{ margin: 0, fontSize: '0.8rem', color: '#666' }}>{invoice.date}</p>
             {isPaid ? (
-              <div style={{ display: 'inline-block', marginTop: '10px', padding: '4px 10px', background: 'rgba(46, 204, 113, 0.1)', color: '#2ecc71', border: '1px solid #2ecc71', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                LUNAS
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px', marginTop: '10px' }}>
+                <div style={{ display: 'inline-block', padding: '4px 10px', background: 'rgba(46, 204, 113, 0.1)', color: '#2ecc71', border: '1px solid #2ecc71', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                  ✅ LUNAS
+                </div>
+                {invoice.orderStatus === 'Waiting_Verification' && (
+                  <div style={{ display: 'inline-block', padding: '3px 8px', background: 'rgba(52, 152, 219, 0.1)', color: '#3498db', border: '1px solid #3498db', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 'bold' }}>
+                    ⏳ MENUNGGU KONFIRMASI ADMIN
+                  </div>
+                )}
               </div>
             ) : isWaiting ? (
               <div style={{ display: 'inline-block', marginTop: '10px', padding: '4px 10px', background: 'rgba(52, 152, 219, 0.1)', color: '#3498db', border: '1px solid #3498db', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                MENUNGGU VERIFIKASI
+                ⏳ MENUNGGU VERIFIKASI
               </div>
             ) : (
               <div style={{ display: 'inline-block', marginTop: '10px', padding: '4px 10px', background: 'rgba(241, 196, 15, 0.1)', color: '#f39c12', border: '1px solid #f1c40f', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
@@ -292,7 +332,7 @@ export default function InvoiceReceipt() {
               <p style={{ margin: '5px 0 0 0' }}>Pesanan akan segera diproses dan dikirim ke alamat tujuan.</p>
             </>
           ) : isWaiting ? (
-            <p style={{ margin: 0 }}>Pembayaran Anda sedang dalam verifikasi oleh Admin.</p>
+            <p style={{ margin: 0 }}>Pembayaran Anda sedang dalam proses verifikasi oleh Admin. Pesanan akan segera diproses.</p>
           ) : (
             <p style={{ margin: 0 }}>Silakan selesaikan pembayaran agar pesanan dapat diproses.</p>
           )}
@@ -360,12 +400,12 @@ export default function InvoiceReceipt() {
         ) : (
           <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', justifyContent: 'center' }}>
             <button 
-              onClick={handlePrint}
+              onClick={handleDownload}
               style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 25px', background: 'transparent', border: '1px solid #fff', color: '#fff', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 'bold' }}
               onMouseEnter={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#111'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#fff'; }}
             >
-              <Printer size={18} /> Cetak Bukti (PDF)
+              <Download size={18} /> Download Bukti (PDF)
             </button>
             <button 
               onClick={() => navigate('/manga')}
@@ -375,12 +415,12 @@ export default function InvoiceReceipt() {
               <ShoppingBag size={18} /> Belanja Lagi
             </button>
             <button 
-              onClick={() => navigate('/profile')}
+              onClick={() => navigate(-1)}
               style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 25px', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 'bold' }}
               onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
             >
-              <ArrowLeft size={18} /> Ke Profil
+              <ArrowLeft size={18} /> Kembali
             </button>
             {isPaid && (invoice.trackingNumber) && (
               <button 

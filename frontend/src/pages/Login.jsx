@@ -31,8 +31,8 @@ export default function Login({ setIsLoggedIn }) {
 
       if (response.data.success) {
         const { accessToken, refreshToken, user } = response.data.data;
-        const isAdmin = user?.role === 'Admin';
-
+        const isAdmin = user?.role && user.role.toLowerCase() === 'admin';
+        
         if (isAdmin) {
           localStorage.setItem('adminAccessToken', accessToken);
           localStorage.setItem('adminRefreshToken', refreshToken);

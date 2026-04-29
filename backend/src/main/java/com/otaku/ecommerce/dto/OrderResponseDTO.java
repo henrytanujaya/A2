@@ -22,6 +22,7 @@ public class OrderResponseDTO {
     private String paymentMethod;
     private List<OrderItemResponseDTO> items;
     private List<OrderTrackingDTO> trackingHistory;
+    private List<PaymentProofDTO> paymentProofs;
 
     public Integer getOrderId() { return orderId; }
     public void setOrderId(Integer orderId) { this.orderId = orderId; }
@@ -57,4 +58,22 @@ public class OrderResponseDTO {
     public void setItems(List<OrderItemResponseDTO> items) { this.items = items; }
     public List<OrderTrackingDTO> getTrackingHistory() { return trackingHistory; }
     public void setTrackingHistory(List<OrderTrackingDTO> trackingHistory) { this.trackingHistory = trackingHistory; }
+    public List<PaymentProofDTO> getPaymentProofs() { return paymentProofs; }
+    public void setPaymentProofs(List<PaymentProofDTO> paymentProofs) { this.paymentProofs = paymentProofs; }
+
+    public static class PaymentProofDTO {
+        private String proofType;
+        private String externalReference;
+        private String description;
+        private LocalDateTime createdAt;
+
+        public String getProofType() { return proofType; }
+        public void setProofType(String proofType) { this.proofType = proofType; }
+        public String getExternalReference() { return externalReference; }
+        public void setExternalReference(String externalReference) { this.externalReference = externalReference; }
+        public String getDescription() { return description; }
+        public void setDescription(String description) { this.description = description; }
+        public LocalDateTime getCreatedAt() { return createdAt; }
+        public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    }
 }

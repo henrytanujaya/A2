@@ -24,6 +24,7 @@ import AdminLayout from './pages/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminStock from './pages/admin/AdminStock';
 import AdminOrders from './pages/admin/AdminOrders';
+import SalesAudit from './pages/admin/SalesAudit';
 
 import { CartProvider } from './contexts/CartContext';
 import { ModalProvider } from './contexts/ModalContext';
@@ -65,6 +66,7 @@ function AppContent() {
             <Route index element={<AdminDashboard />} />
             <Route path="stock" element={<AdminStock />} />
             <Route path="orders" element={<AdminOrders />} />
+            <Route path="audit" element={<SalesAudit />} />
           </Route>
         </Routes>
       </main>

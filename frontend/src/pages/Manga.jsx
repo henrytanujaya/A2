@@ -33,22 +33,33 @@ export default function Manga() {
   const genres = ['All', 'Dark Fantasy', 'Isekai', 'Action'];
 
   useEffect(() => {
+    let isMounted = true;
     const fetchManga = async () => {
       try {
         const response = await axiosInstance.get('/api/v1/products');
-        if (response.data.success) {
+        if (response.data.success && isMounted) {
           const allProducts = response.data.data;
           const mangas = allProducts.filter(p => p.category === 'Manga');
           setMangaDatabases(mangas);
         }
       } catch (err) {
         console.error('Failed to fetch manga products', err);
-        setError('Gagal memuat data manga. Pastikan server backend aktif.');
+        if (isMounted && mangaDatabases.length === 0) setError('Gagal memuat data manga. Pastikan server backend aktif.');
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
+    
+    // Initial fetch
     fetchManga();
+    
+    // Poll every 3 seconds for real-time stock updates
+    const intervalId = setInterval(fetchManga, 3000);
+    
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
   }, []);
 
   // Sorting newest first and applying filters

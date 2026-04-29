@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 export default function Cart() {
   const { cart, removeFromCart } = useCart();
 
-  const total = cart.reduce((acc, item) => acc + item.price, 0);
+  const total = cart.reduce((acc, item) => acc + (item.price * (item.quantity || 1)), 0);
 
   return (
     <div className="container" style={{ paddingTop: '100px', paddingBottom: '50px', minHeight: '80vh', position: 'relative', zIndex: 10 }}>
@@ -45,8 +45,13 @@ export default function Cart() {
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '10px', whiteSpace: 'pre-line', lineHeight: '1.5' }}>
                     {item.details}
                   </div>
-                  <div style={{ color: 'var(--accent-crimson)', fontWeight: 'bold', fontSize: '1.1rem' }}>
-                    Rp {item.price.toLocaleString('id-ID')}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ color: 'var(--accent-crimson)', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                      Rp {item.price.toLocaleString('id-ID')}
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '4px 12px', borderRadius: '6px', fontSize: '0.9rem', color: '#ccc', border: '1px solid #333' }}>
+                      Jumlah: {item.quantity || 1}
+                    </div>
                   </div>
                 </div>
 
@@ -70,7 +75,7 @@ export default function Cart() {
             <h2 style={{ marginBottom: '20px', fontSize: '1.4rem' }}>Ringkasan Belanja</h2>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', color: 'var(--text-muted)' }}>
               <span>Total Item:</span>
-              <span>{cart.length} Barang</span>
+              <span>{cart.reduce((acc, item) => acc + (item.quantity || 1), 0)} Barang</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '25px', fontSize: '1.2rem', fontWeight: 'bold' }}>
               <span>Total Harga:</span>

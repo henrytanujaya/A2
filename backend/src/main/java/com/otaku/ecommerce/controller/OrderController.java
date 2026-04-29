@@ -99,4 +99,11 @@ public class OrderController {
         orderService.updateOrderDetails(id, finalStatus, courierCode, trackingNumber);
         return ResponseEntity.ok(ApiResponse.success("OTK-2024", "Status order berhasil diperbarui", null));
     }
+
+    @PutMapping("/{id}/cancel")
+    @PreAuthorize("hasRole('Admin') or @orderSecurity.isOrderOwner(#id, authentication.name)")
+    public ResponseEntity<ApiResponse<Void>> cancelOrder(@PathVariable Integer id, Authentication authentication) {
+        orderService.cancelOrder(id, authentication.getName());
+        return ResponseEntity.ok(ApiResponse.success("OTK-2026", "Pesanan berhasil dibatalkan", null));
+    }
 }

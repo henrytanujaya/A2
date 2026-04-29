@@ -10,22 +10,30 @@ export default function Home() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchTopProducts = async () => {
       try {
         const response = await axiosInstance.get('/api/v1/products');
-        if (response.data.success) {
+        if (response.data.success && isMounted) {
           const allProducts = response.data.data;
           const sorted = allProducts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 4);
           setTopProducts(sorted);
         }
       } catch (err) {
         console.error("Failed to fetch products:", err);
-        setError("Gagal memuat produk. Pastikan server backend aktif dan coba refresh halaman.");
+        if (isMounted && topProducts.length === 0) setError("Gagal memuat produk. Pastikan server backend aktif dan coba refresh halaman.");
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
+    
     fetchTopProducts();
+    const intervalId = setInterval(fetchTopProducts, 3000);
+    
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
   }, []);
 
   return (

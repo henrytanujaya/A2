@@ -1,27 +1,75 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, Plus, Minus, CheckCircle } from 'lucide-react';
+import axiosInstance from '../../api/axiosInstance';
 
 export default function AdminStock() {
-  const [products, setProducts] = useState([
-    { id: 101, name: 'Berserk - Deluxe Edition Vol 1', category: 'Manga', price: 'Rp 450.000', stock: 15 },
-    { id: 102, name: 'Attack on Titan Vol 34', category: 'Manga', price: 'Rp 120.000', stock: 42 },
-    { id: 103, name: 'Solo Leveling Vol 1', category: 'Manga', price: 'Rp 180.000', stock: 30 },
-    { id: 'paket-a', name: 'Paket A (Manga + Keychain)', category: 'Merchandise', price: 'Rp 125.000', stock: 50 },
-    { id: 'paket-b', name: 'Paket B (Custom Pakaian + Sticker)', category: 'Merchandise', price: 'Rp 135.000', stock: 25 },
-    { id: 'paket-c', name: 'Paket C (Custom Figure + Mini Poster)', category: 'Merchandise', price: 'Rp 340.000', stock: 10 },
-  ]);
+  const [products, setProducts] = useState([]);
+  const [originalProducts, setOriginalProducts] = useState({});
+  const [loading, setLoading] = useState(true);
 
   const [showModal, setShowModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const res = await axiosInstance.get('/api/v1/products');
+      if (res.data.success) {
+        const fetchedProducts = res.data.data.map(p => ({
+          id: p.id,
+          name: p.name,
+          category: p.category,
+          price: `Rp ${p.price.toLocaleString('id-ID')}`,
+          stock: p.stockQuantity
+        }));
+        setProducts(fetchedProducts);
+        
+        const orig = {};
+        fetchedProducts.forEach(p => orig[p.id] = p.stock);
+        setOriginalProducts(orig);
+      }
+    } catch (err) {
+      console.error("Gagal memuat produk", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleStockChange = (id, newStock) => {
     if (newStock < 0) return;
     setProducts(products.map(p => p.id === id ? { ...p, stock: newStock } : p));
   };
 
-  const handleSave = () => {
-    setModalMessage("Perubahan stok berhasil disimpan dan diupdate!");
+  const handleSave = async () => {
+    const promises = [];
+    products.forEach(p => {
+      if (p.stock !== originalProducts[p.id]) {
+        promises.push(axiosInstance.patch(`/api/v1/products/${p.id}/stock?quantity=${p.stock}`));
+      }
+    });
+
+    if (promises.length === 0) {
+      setModalMessage("Tidak ada perubahan stok untuk disimpan.");
+      setShowModal(true);
+      return;
+    }
+
+    try {
+      await Promise.all(promises);
+      setModalMessage("Perubahan stok berhasil disimpan dan disinkronisasi ke database!");
+      
+      const orig = { ...originalProducts };
+      products.forEach(p => orig[p.id] = p.stock);
+      setOriginalProducts(orig);
+    } catch (err) {
+      console.error("Gagal menyimpan stok", err);
+      setModalMessage("Gagal menyimpan perubahan stok. Coba lagi.");
+    }
     setShowModal(true);
   };
 
@@ -68,46 +116,56 @@ export default function AdminStock() {
               </tr>
             </thead>
             <tbody>
-              {products.map((product) => (
-                <tr key={product.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', transition: 'background 0.2s' }} onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
-                  <td style={{ padding: '15px 20px', color: '#a0a0b0' }}>#{product.id}</td>
-                  <td style={{ padding: '15px 20px', color: '#fff' }}>{product.name}</td>
-                  <td style={{ padding: '15px 20px' }}>
-                    <span style={{ 
-                      padding: '4px 10px', borderRadius: '20px', fontSize: '0.8rem',
-                      background: 'rgba(255,255,255,0.1)', color: '#a0a0b0'
-                    }}>
-                      {product.category}
-                    </span>
-                  </td>
-                  <td style={{ padding: '15px 20px', color: '#fff' }}>{product.price}</td>
-                  <td style={{ padding: '15px 20px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}>
-                    <button 
-                      onClick={() => handleStockChange(product.id, product.stock - 1)}
-                      style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', width: '30px', height: '30px', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      <Minus size={16} />
-                    </button>
-                    <input 
-                      type="number" 
-                      value={product.stock}
-                      onChange={(e) => handleStockChange(product.id, parseInt(e.target.value) || 0)}
-                      style={{ 
-                        width: '60px', padding: '5px', textAlign: 'center', 
-                        background: 'rgba(0,0,0,0.3)', border: '1px solid #333', 
-                        color: product.stock < 10 ? '#e74c3c' : '#fff', 
-                        borderRadius: '5px', fontWeight: 'bold'
-                      }}
-                    />
-                    <button 
-                      onClick={() => handleStockChange(product.id, product.stock + 1)}
-                      style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', width: '30px', height: '30px', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      <Plus size={16} />
-                    </button>
-                  </td>
+              {loading ? (
+                <tr>
+                  <td colSpan="5" style={{ padding: '20px', textAlign: 'center', color: '#a0a0b0' }}>Memuat stok barang...</td>
                 </tr>
-              ))}
+              ) : products.length === 0 ? (
+                <tr>
+                  <td colSpan="5" style={{ padding: '20px', textAlign: 'center', color: '#a0a0b0' }}>Tidak ada produk ditemukan.</td>
+                </tr>
+              ) : (
+                products.map((product) => (
+                  <tr key={product.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', transition: 'background 0.2s' }} onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '15px 20px', color: '#a0a0b0' }}>#{product.id}</td>
+                    <td style={{ padding: '15px 20px', color: '#fff' }}>{product.name}</td>
+                    <td style={{ padding: '15px 20px' }}>
+                      <span style={{ 
+                        padding: '4px 10px', borderRadius: '20px', fontSize: '0.8rem',
+                        background: 'rgba(255,255,255,0.1)', color: '#a0a0b0'
+                      }}>
+                        {product.category}
+                      </span>
+                    </td>
+                    <td style={{ padding: '15px 20px', color: '#fff' }}>{product.price}</td>
+                    <td style={{ padding: '15px 20px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}>
+                      <button 
+                        onClick={() => handleStockChange(product.id, product.stock - 1)}
+                        style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', width: '30px', height: '30px', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Minus size={16} />
+                      </button>
+                      <input 
+                        type="number" 
+                        value={product.stock}
+                        onChange={(e) => handleStockChange(product.id, parseInt(e.target.value) || 0)}
+                        style={{ 
+                          width: '60px', padding: '5px', textAlign: 'center', 
+                          background: 'rgba(0,0,0,0.3)', border: '1px solid #333', 
+                          color: product.stock !== originalProducts[product.id] ? '#f1c40f' : (product.stock < 10 ? '#e74c3c' : '#fff'), 
+                          borderRadius: '5px', fontWeight: 'bold'
+                        }}
+                      />
+                      <button 
+                        onClick={() => handleStockChange(product.id, product.stock + 1)}
+                        style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', width: '30px', height: '30px', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

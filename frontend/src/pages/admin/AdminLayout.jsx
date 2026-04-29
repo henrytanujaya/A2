@@ -1,11 +1,34 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Package, LogOut } from 'lucide-react';
+import { LayoutDashboard, Package, LogOut, BarChart3, Bell } from 'lucide-react';
 import SakuraBackground from '../../components/SakuraBackground';
+import axiosInstance from '../../api/axiosInstance';
 
 export default function AdminLayout({ setIsLoggedIn }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  const fetchNotificationCount = async () => {
+    try {
+      const res = await axiosInstance.get('/api/v1/orders/paged', {
+        params: { tab: 'Waiting_Verification', page: 0, size: 1 }
+      });
+      if (res.data.success) {
+        setNotificationCount(res.data.data.totalElements);
+      }
+    } catch (error) {
+      console.error("Failed to fetch notifications:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotificationCount();
+    const interval = setInterval(() => {
+      fetchNotificationCount();
+    }, 5000); // 5 detik untuk Live Demo
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('adminUserData');
@@ -76,11 +99,41 @@ export default function AdminLayout({ setIsLoggedIn }) {
               background: isActive('/admin/orders') ? 'rgba(220, 20, 60, 0.2)' : 'transparent',
               color: isActive('/admin/orders') ? '#dc143c' : '#a0a0b0',
               border: isActive('/admin/orders') ? '1px solid rgba(220, 20, 60, 0.5)' : '1px solid transparent',
-              transition: 'all 0.3s ease'
+              transition: 'all 0.3s ease',
+              position: 'relative'
             }}
           >
             <Package size={20} />
-            Pesanan
+            <span style={{ flex: 1 }}>Pesanan</span>
+            {notificationCount > 0 && !isActive('/admin/orders') && (
+              <span style={{
+                background: '#dc143c',
+                color: '#fff',
+                fontSize: '0.7rem',
+                fontWeight: 'bold',
+                padding: '2px 6px',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                <Bell size={10} /> {notificationCount}
+              </span>
+            )}
+          </Link>
+          <Link 
+            to="/admin/audit" 
+            style={{
+              display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 15px',
+              borderRadius: '8px', textDecoration: 'none',
+              background: isActive('/admin/audit') ? 'rgba(220, 20, 60, 0.2)' : 'transparent',
+              color: isActive('/admin/audit') ? '#dc143c' : '#a0a0b0',
+              border: isActive('/admin/audit') ? '1px solid rgba(220, 20, 60, 0.5)' : '1px solid transparent',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            <BarChart3 size={20} />
+            Audit Penjualan
           </Link>
         </nav>
 

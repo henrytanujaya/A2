@@ -52,9 +52,12 @@ public class SecurityConfig {
                         .requestMatchers("/", "/error", "/uploads/**").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/payments/webhook").permitAll()
+                        .requestMatchers("/api/v1/tracking/webhook").permitAll()
+                        .requestMatchers("/api/v1/shipping/biteship-webhook").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/discounts/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/shipping/**").permitAll()
+                        .requestMatchers("/api/v1/cart/guest", "/api/v1/cart/guest/**").permitAll()
                         // ─── Swagger / OpenAPI ───
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         // ─── Admin Only ───────────────────────────────────────

@@ -16,7 +16,9 @@ import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.otaku.ecommerce.entity.PaymentLog;
+import com.otaku.ecommerce.entity.PaymentProof;
 import com.otaku.ecommerce.repository.PaymentLogRepository;
+import com.otaku.ecommerce.repository.PaymentProofRepository;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -36,6 +38,9 @@ public class PaymentService {
     private PaymentLogRepository paymentLogRepository;
 
     @Autowired
+    private PaymentProofRepository paymentProofRepository;
+
+    @Autowired
     private OrderService orderService;
 
     @Autowired
@@ -44,7 +49,6 @@ public class PaymentService {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @SuppressWarnings({ "unchecked", "null" })
     public PaymentResponseDTO createPaymentToken(String userEmail, PaymentRequestDTO request) {
         if (request.getOrderId() == null) {
             throw new CustomBusinessException("OTK-400", "Order ID wajib diisi", 400);
@@ -60,7 +64,6 @@ public class PaymentService {
         // Jika sudah ada invoice valid, kembalikan yang lama
         if (order.getPaymentUrl() != null && "UNPAID".equals(order.getPaymentStatus())) {
             PaymentResponseDTO response = new PaymentResponseDTO();
-            @SuppressWarnings("null")
             String invoiceId = order.getPaymentInvoiceId();
             response.setToken(invoiceId);
             response.setPaymentUrl(order.getPaymentUrl());
@@ -112,9 +115,12 @@ public class PaymentService {
 
     @Transactional
     public void processXenditWebhook(Map<String, Object> payload) {
-        // 0. Awal pemrosesan dengan proteksi null
+        // 0. Logging Agresif untuk Debugging Webhook
+        System.out.println(">>> [WEBHOOK-XENDIT] Menerima request dari Xendit");
+        System.out.println(">>> Payload: " + payload);
+
         if (payload == null || payload.get("external_id") == null) {
-            System.out.println("Webhook Info: Payload kosong atau tidak memiliki external_id. Dilewati.");
+            System.err.println(">>> [WEBHOOK-XENDIT] Error: Payload kosong atau tidak memiliki external_id.");
             return;
         }
 
@@ -138,13 +144,16 @@ public class PaymentService {
         // externalId format: "ORDER-123"
         Integer orderId;
         try {
-            if (!externalId.startsWith("ORDER-")) {
-                System.out.println("Webhook Info: Menerima data non-order atau simulasi tes (" + externalId + "). Dilewati.");
+            // Hilangkan pengecekan kaku .startsWith("ORDER-") agar bisa menerima ID angka langsung dari simulator
+            String cleanedId = externalId.replaceAll("[^0-9]", "");
+            if (cleanedId.isEmpty()) {
+                System.out.println(">>> [WEBHOOK-XENDIT] Info: External ID tidak mengandung angka (" + externalId + "). Dilewati.");
                 return;
             }
-            orderId = Integer.parseInt(externalId.replace("ORDER-", ""));
+            orderId = Integer.parseInt(cleanedId);
+            System.out.println(">>> [WEBHOOK-XENDIT] Memproses Order ID: " + orderId);
         } catch (Exception e) {
-            System.err.println("Gagal memproses External ID: " + externalId);
+            System.err.println(">>> [WEBHOOK-XENDIT] Gagal memproses External ID: " + externalId);
             return;
         }
         
@@ -189,6 +198,16 @@ public class PaymentService {
                     orderService.updateOrderStatus(orderId, "Waiting_Verification");
                     orderService.addTrackingHistory(orderId, "Waiting_Verification",
                             "Pembayaran terverifikasi & stok aman.");
+                    
+                    // AUTOMATION: Capture proof immediately for Admin visibility
+                    PaymentProof proof = new PaymentProof();
+                    proof.setOrder(order);
+                    proof.setProofType("XENDIT_PAYMENT");
+                    proof.setExternalReference(externalId);
+                    proof.setDescription("Bukti lunas otomatis dari Xendit (Status: " + status + ")");
+                    paymentProofRepository.save(proof);
+                    System.out.println("Proof captured immediately for Order ID: " + orderId);
+
                 } else {
                     // GAGAL kurangi stok (Konflik) -> Set status khusus
                     order.setStatus("STOCK_CONFLICT");

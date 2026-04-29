@@ -47,4 +47,12 @@ public class PaymentController {
 
         return ResponseEntity.ok(ApiResponse.success("OTK-200", "Webhook received and processed", null));
     }
+
+    // Endpoint Simulator untuk Developer (Testing tanpa ngrok)
+    @PostMapping("/simulate-webhook")
+    public ResponseEntity<ApiResponse<Void>> simulateWebhook(@RequestBody Map<String, Object> payload) {
+        System.out.println(">>> [SIMULATOR] Memicu simulasi webhook...");
+        paymentService.processXenditWebhook(payload);
+        return ResponseEntity.ok(ApiResponse.success("OTK-200", "Simulasi webhook berhasil dipicu", null));
+    }
 }

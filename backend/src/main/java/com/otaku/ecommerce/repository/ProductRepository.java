@@ -13,4 +13,12 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("UPDATE Product p SET p.stockQuantity = p.stockQuantity - :qty WHERE p.id = :id AND p.stockQuantity >= :qty")
     int reduceStock(Integer id, Integer qty);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("UPDATE Product p SET p.stockQuantity = p.stockQuantity + :qty WHERE p.id = :id")
+    int increaseStock(Integer id, Integer qty);
+
+    long countByStockQuantityLessThan(int stock);
+
+    List<Product> findTop5ByOrderByUpdatedAtDesc();
 }

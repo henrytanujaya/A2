@@ -17,9 +17,34 @@ export default function AdminOrders() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
   const [showDropdown, setShowDropdown] = useState(false);
-  const pageSize = 25;
+  const pageSize = 10;
+
+  // Modal Input Nomor Resi
+  const [resiModal, setResiModal] = useState({ open: false, orderId: null, courierName: '' });
+  const [resiInput, setResiInput] = useState('');
+  const [automating, setAutomating] = useState(null); // Track which order is being automated
 
   const { showModal } = useModal();
+
+  const handleShipWithResi = async () => {
+    if (!resiInput.trim()) {
+      showModal("Nomor resi tidak boleh kosong!", "error");
+      return;
+    }
+    const { orderId } = resiModal;
+    setResiModal({ open: false, orderId: null, courierName: '' });
+    try {
+      await axiosInstance.patch(`/api/v1/orders/${orderId}/status`, null, {
+        params: { status: 'Shipped', trackingNumber: resiInput.trim() }
+      });
+      showModal(`🚚 Pesanan berhasil dikirim! Resi: ${resiInput.trim()}`, "success");
+      setResiInput('');
+      fetchOrders();
+    } catch (error) {
+      console.error("Ship order error:", error);
+      showModal("Gagal mengirim pesanan.", "error");
+    }
+  };
 
   const searchTypeOptions = [
     { value: 'id', label: 'ID Pesanan' },
@@ -30,7 +55,6 @@ export default function AdminOrders() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      // Menggunakan endpoint paged untuk server-side pagination & filtering
       const res = await axiosInstance.get('/api/v1/orders/paged', {
         params: {
           tab: activeTab,
@@ -53,12 +77,12 @@ export default function AdminOrders() {
     }
   };
 
-  // Fetch orders whenever filters or page change
   useEffect(() => {
     fetchOrders();
+    const interval = setInterval(() => fetchOrders(true), 5000);
+    return () => clearInterval(interval);
   }, [activeTab, searchType, currentPage]);
 
-  // Reset page saat tab atau tipe cari berubah
   useEffect(() => {
     setCurrentPage(0);
   }, [activeTab, searchType]);
@@ -74,30 +98,135 @@ export default function AdminOrders() {
       await axiosInstance.patch(`/api/v1/orders/${orderId}/status`, null, {
         params: { status: 'Processing' }
       });
-      showModal("Pembayaran berhasil divalidasi dan pesanan diproses!", "success");
+      showModal("Pembayaran divalidasi!", "success");
       fetchOrders();
     } catch (error) {
       console.error("Validation error:", error);
-      showModal("Gagal memvalidasi pembayaran.", "error");
+      showModal("Gagal memvalidasi.", "error");
     }
   };
 
   const handleCancelOrder = async (orderId) => {
-    if (!window.confirm("Apakah Anda yakin ingin membatalkan pesanan ini?")) return;
+    if (!window.confirm("Batalkan pesanan?")) return;
     try {
       await axiosInstance.patch(`/api/v1/orders/${orderId}/status`, null, {
         params: { status: 'Cancelled' }
       });
-      showModal("Pesanan berhasil dibatalkan.", "success");
+      showModal("Dibatalkan.", "success");
       fetchOrders();
     } catch (error) {
-      console.error("Cancel order error:", error);
-      showModal("Gagal membatalkan pesanan.", "error");
+      console.error("Cancel error:", error);
     }
+  };
+
+  const handleDelivered = async (orderId) => {
+    try {
+      await axiosInstance.patch(`/api/v1/orders/${orderId}/status`, null, {
+        params: { status: 'Delivered' }
+      });
+      showModal("Pesanan ditandai sebagai Sampai di Tujuan!", "success");
+      fetchOrders();
+    } catch (error) {
+      console.error("Delivery status error:", error);
+      showModal("Gagal memperbarui status pengiriman.", "error");
+    }
+  };
+
+  const handleAutomateShipping = async (orderId) => {
+    setAutomating(orderId);
+    try {
+      const res = await axiosInstance.post(`/api/v1/admin/orders/${orderId}/automate-shipping`);
+      if (res.data.success) {
+        showModal(`🚚 Resi Otomatis Berhasil Dibuat: ${res.data.data.trackingNumber}`, "success");
+        fetchOrders();
+      }
+    } catch (error) {
+      console.error("Automation error:", error);
+      showModal("Gagal menjalankan otomasi logistik.", "error");
+    } finally {
+      setAutomating(null);
+    }
+  };
+
+  const handleShowProof = (proofs, type) => {
+    const safeProofs = proofs || [];
+    const relevantProofs = safeProofs.filter(p => type === 'all' || p.proofType === type);
+    if (relevantProofs.length === 0) {
+      showModal(`Tidak ada bukti ${type === 'XENDIT_PAYMENT' ? 'pembayaran' : 'pengiriman'} ditemukan.`, 'info');
+      return;
+    }
+    
+    const proofText = relevantProofs.map(p => 
+      `• [${p.createdAt}] ${p.description}\n  Ref: ${p.externalReference}`
+    ).join('\n\n');
+    
+    showModal(`Detail Bukti:\n\n${proofText}`, 'info');
   };
 
   return (
     <div style={{ padding: '20px' }} onClick={() => setShowDropdown(false)}>
+
+      {/* ── Modal Input Nomor Resi ── */}
+      {resiModal.open && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div style={{
+            background: '#1a1a24', border: '1px solid #333', borderRadius: '16px',
+            padding: '30px', width: '100%', maxWidth: '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.8)'
+          }}>
+            <h3 style={{ margin: '0 0 5px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Truck size={20} color="#3498db" /> Input Nomor Resi
+            </h3>
+            <p style={{ color: '#888', fontSize: '0.85rem', margin: '0 0 20px 0' }}>
+              Pesanan #{resiModal.orderId} &bull; {resiModal.courierName}
+            </p>
+            <label style={{ display: 'block', fontSize: '0.85rem', color: '#a0a0b0', marginBottom: '8px' }}>
+              Nomor Resi (Waybill)
+            </label>
+            <input
+              id="resi-input"
+              type="text"
+              autoFocus
+              value={resiInput}
+              onChange={(e) => setResiInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleShipWithResi()}
+              placeholder="Contoh: JNE123456789ID"
+              style={{
+                width: '100%', padding: '12px', background: 'rgba(0,0,0,0.4)',
+                border: '1px solid #444', color: '#fff', borderRadius: '8px',
+                fontSize: '0.95rem', outline: 'none', marginBottom: '20px',
+                boxSizing: 'border-box'
+              }}
+            />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={handleShipWithResi}
+                style={{
+                  flex: 1, padding: '12px', background: '#3498db', color: '#fff',
+                  border: 'none', borderRadius: '8px', cursor: 'pointer',
+                  fontWeight: 'bold', fontSize: '0.9rem', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', gap: '8px'
+                }}
+              >
+                <Truck size={16} /> Kirim Pesanan
+              </button>
+              <button
+                onClick={() => { setResiModal({ open: false, orderId: null, courierName: '' }); setResiInput(''); }}
+                style={{
+                  padding: '12px 20px', background: 'rgba(255,255,255,0.07)',
+                  color: '#ccc', border: '1px solid #333', borderRadius: '8px', cursor: 'pointer'
+                }}
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', flexWrap: 'wrap', gap: '20px' }}>
         <h1 style={{ fontSize: '1.8rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Package color="#dc143c" /> Kelola Pesanan & Resi
@@ -105,22 +234,14 @@ export default function AdminOrders() {
         
         <form onSubmit={handleSearch} style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            {/* Premium Custom Dropdown dari Upstream */}
+            {/* Custom Dropdown */}
             <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
               <div
                 onClick={() => setShowDropdown(!showDropdown)}
                 style={{
-                  padding: '10px 15px',
-                  background: 'rgba(0,0,0,0.3)',
-                  border: '1px solid #333',
-                  color: '#fff',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  minWidth: '130px',
-                  justifyContent: 'space-between'
+                  padding: '10px 15px', background: 'rgba(0,0,0,0.3)', border: '1px solid #333',
+                  color: '#fff', borderRadius: '8px', cursor: 'pointer', display: 'flex',
+                  alignItems: 'center', gap: '8px', minWidth: '130px', justifyContent: 'space-between'
                 }}
               >
                 {searchTypeOptions.find(opt => opt.value === searchType)?.label}
@@ -132,41 +253,22 @@ export default function AdminOrders() {
               <AnimatePresence>
                 {showDropdown && (
                   <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
+                    initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
                     style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      marginTop: '8px',
-                      background: '#1a1a24',
-                      border: '1px solid #333',
-                      borderRadius: '8px',
-                      width: '100%',
-                      overflow: 'hidden',
-                      zIndex: 10,
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+                      position: 'absolute', top: '100%', left: 0, marginTop: '8px',
+                      background: '#1a1a24', border: '1px solid #333', borderRadius: '8px',
+                      width: '100%', overflow: 'hidden', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
                     }}
                   >
                     {searchTypeOptions.map(opt => (
                       <div
                         key={opt.value}
-                        onClick={() => {
-                          setSearchType(opt.value);
-                          setShowDropdown(false);
-                          setCurrentPage(0);
-                        }}
+                        onClick={() => { setSearchType(opt.value); setShowDropdown(false); setCurrentPage(0); }}
                         style={{
-                          padding: '10px 15px',
-                          cursor: 'pointer',
+                          padding: '10px 15px', cursor: 'pointer', fontSize: '0.9rem',
                           background: searchType === opt.value ? 'rgba(220, 20, 60, 0.2)' : 'transparent',
-                          color: searchType === opt.value ? 'var(--accent-crimson)' : '#ccc',
-                          transition: 'background 0.2s',
-                          fontSize: '0.9rem'
+                          color: searchType === opt.value ? 'var(--accent-crimson)' : '#ccc'
                         }}
-                        onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.05)'}
-                        onMouseLeave={(e) => e.target.style.background = searchType === opt.value ? 'rgba(220, 20, 60, 0.2)' : 'transparent'}
                       >
                         {opt.label}
                       </div>
@@ -176,21 +278,17 @@ export default function AdminOrders() {
               </AnimatePresence>
             </div>
 
+            {/* Search Input */}
             <div style={{ position: 'relative' }}>
               <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
               <input
                 type="text"
-                placeholder={`Cari...`}
+                placeholder="Cari..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
-                  padding: '10px 10px 10px 38px',
-                  background: 'rgba(0,0,0,0.3)',
-                  border: '1px solid #333',
-                  color: '#fff',
-                  borderRadius: '8px',
-                  width: '200px',
-                  outline: 'none'
+                  padding: '10px 10px 10px 38px', background: 'rgba(0,0,0,0.3)', border: '1px solid #333',
+                  color: '#fff', borderRadius: '8px', width: '200px', outline: 'none'
                 }}
               />
             </div>
@@ -205,26 +303,47 @@ export default function AdminOrders() {
         </form>
       </div>
 
-      {/* Admin Tabs */}
+      {/* Admin Tabs - Custom Color Coded sesuai permintaan user */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '25px', borderBottom: '1px solid #333', paddingBottom: '15px', overflowX: 'auto' }}>
-        {['all', 'Waiting_Verification', 'Processing', 'Shipped', 'Completed', 'Cancelled'].map(tab => (
+        {[
+          { id: 'all', label: 'SEMUA', color: '#f1c40f', badge: false }, // Kuning
+          { id: 'Waiting_Verification', label: 'VALIDASI BAYAR 💸', color: '#2ecc71', badge: orders.some(o => o.status === 'Waiting_Verification') }, // Hijau
+          { id: 'Processing', label: 'PROCESSING', color: '#3498db', badge: false }, // Biru
+          { id: 'Shipped', label: 'SHIPPED', color: '#fff', badge: orders.some(o => o.status === 'Shipped' && o.trackingHistory?.some(h => h.description?.toLowerCase().includes("sampai"))) }, // Putih
+          { id: 'Completed', label: 'COMPLETED', color: '#e67e22', badge: false }, // Oranye
+          { id: 'Cancelled', label: 'CANCELLED', color: '#555', badge: false }, // Hitam
+        ].map(tab => (
           <button
-            key={tab}
-            onClick={() => { setActiveTab(tab); setCurrentPage(0); }}
+            key={tab.id}
+            onClick={() => { setActiveTab(tab.id); setCurrentPage(0); }}
             style={{
-              padding: '8px 16px',
-              borderRadius: '20px',
-              border: 'none',
+              padding: '8px 20px',
+              borderRadius: '8px',
+              border: activeTab === tab.id ? `2px solid ${tab.color}` : '1px solid rgba(255,255,255,0.1)',
               cursor: 'pointer',
-              background: activeTab === tab ? 'var(--accent-crimson)' : 'rgba(255,255,255,0.05)',
-              color: activeTab === tab ? '#fff' : '#888',
-              fontSize: '0.85rem',
+              background: activeTab === tab.id ? `${tab.color}20` : 'rgba(255,255,255,0.05)',
+              color: activeTab === tab.id ? tab.color : '#888',
+              fontSize: '0.75rem',
               fontWeight: 'bold',
               transition: 'all 0.2s',
-              whiteSpace: 'nowrap'
+              whiteSpace: 'nowrap',
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
             }}
           >
-            {tab === 'all' ? 'Semua' : tab === 'Waiting_Verification' ? 'Validasi Pembayaran 💸' : tab.toUpperCase()}
+            {tab.label}
+            {tab.badge && (
+              <span style={{ 
+                width: '8px', 
+                height: '8px', 
+                background: '#dc143c', 
+                borderRadius: '50%', 
+                display: 'inline-block',
+                boxShadow: '0 0 10px #dc143c'
+              }}></span>
+            )}
           </button>
         ))}
       </div>
@@ -273,7 +392,12 @@ export default function AdminOrders() {
                           </div>
                         )}
                         {order.status !== 'Waiting_Verification' && (
-                          <div style={{ fontSize: '0.75rem', color: '#888' }}>Kurir: {order.courierName}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#888' }}>
+                            <div>Kurir: {order.courierName}</div>
+                            {order.trackingNumber && (
+                              <div style={{ color: '#3498db', fontWeight: 'bold', marginTop: '2px' }}>Resi: {order.trackingNumber}</div>
+                            )}
+                          </div>
                         )}
                       </td>
                       <td style={{ padding: '15px 20px', fontWeight: 'bold', color: 'var(--accent-crimson)' }}>
@@ -306,9 +430,10 @@ export default function AdminOrders() {
                           <div style={{ display: 'flex', gap: '8px' }}>
                             <button
                               onClick={() => handleValidatePayment(order.orderId)}
+                              title="Validasi pembayaran — ubah ke Processing"
                               style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 15px', background: '#2ecc71', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
                             >
-                              <CheckCircle size={16} /> {order.status === 'Pending' ? 'Simulasi Bayar (Dev)' : 'Proses & Kirim Pesanan'}
+                              <CheckCircle size={16} /> {order.status === 'Pending' ? 'Simulasi Bayar (Dev)' : '✅ Terima & Proses'}
                             </button>
                             <button
                               onClick={() => handleCancelOrder(order.orderId)}
@@ -317,22 +442,82 @@ export default function AdminOrders() {
                             >
                               Batal
                             </button>
+                            {order.paymentProofs?.some(p => p.proofType === 'XENDIT_PAYMENT') && (
+                              <button 
+                                onClick={() => handleShowProof(order.paymentProofs, 'XENDIT_PAYMENT')}
+                                style={{ padding: '8px 12px', background: 'rgba(46, 204, 113, 0.1)', color: '#2ecc71', border: '1px solid #2ecc71', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+                              >
+                                Bukti Bayar
+                              </button>
+                            )}
                           </div>
-                        ) : (order.status === 'Processing' || order.status === 'Shipped') ? (
+                        ) : order.status === 'Processing' ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2ecc71', fontSize: '0.85rem' }}>
-                              <Truck size={16} color="#3498db" />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <CheckCircle size={16} color="#2ecc71" />
+                              <span style={{ fontSize: '0.8rem', color: '#2ecc71', fontWeight: 'bold' }}>TRANSAKSI DITERIMA</span>
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: '#888' }}>Sedang dikemas. Masukkan resi untuk mengirim.</div>
+                            
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                onClick={() => handleAutomateShipping(order.orderId)}
+                                disabled={automating === order.orderId}
+                                style={{ 
+                                  flex: 1, display: 'flex', alignItems: 'center', gap: '8px', 
+                                  padding: '8px 14px', background: '#9b59b6', color: '#fff', 
+                                  border: 'none', borderRadius: '6px', cursor: automating === order.orderId ? 'not-allowed' : 'pointer', 
+                                  fontWeight: 'bold', fontSize: '0.8rem' 
+                                }}
+                              >
+                                {automating === order.orderId ? <Loader2 size={16} className="spinner" /> : <Truck size={16} />}
+                                {automating === order.orderId ? 'Memproses...' : 'Kirim Otomatis (Resi)'}
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setResiInput('');
+                                  setResiModal({ open: true, orderId: order.orderId, courierName: order.courierName || 'Kurir' });
+                                }}
+                                style={{ padding: '8px 12px', background: 'rgba(52, 152, 219, 0.1)', color: '#3498db', border: '1px solid #3498db', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
+                                title="Input Resi Manual"
+                              >
+                                Manual
+                              </button>
+                            </div>
+                            
+                            <button
+                              onClick={() => handleCancelOrder(order.orderId)}
+                              style={{ padding: '7px 12px', background: 'rgba(220, 20, 60, 0.08)', color: '#dc143c', border: '1px solid #dc143c', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }}
+                            >
+                              Batalkan
+                            </button>
+                          </div>
+                        ) : order.status === 'Shipped' ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#9b59b6', fontSize: '0.85rem' }}>
+                              <Truck size={16} color="#9b59b6" />
                               <div>
-                                <div style={{ fontWeight: 'bold', color: '#3498db' }}>{order.status === 'Processing' ? 'SEDANG DIPROSES' : 'DALAM PENGIRIMAN'}</div>
-                                <div style={{ fontSize: '0.7rem', color: '#888' }}>Resi: {order.trackingNumber || 'Auto-Generated'}</div>
+                                <div style={{ fontWeight: 'bold', color: '#9b59b6' }}>DALAM PENGIRIMAN</div>
+                                <div style={{ fontSize: '0.7rem', color: '#888' }}>Resi: {order.trackingNumber || '-'}</div>
                               </div>
                             </div>
 
+                            {/* Tombol Delivered (Sampai) */}
+                            {order.status === 'Shipped' && (
+                              <button
+                                onClick={() => handleDelivered(order.orderId)}
+                                style={{ padding: '8px 12px', background: 'var(--accent-crimson)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.75rem', marginBottom: '5px' }}
+                              >
+                                Tandai Sampai (Delivered)
+                              </button>
+                            )}
+
                             {/* Tombol Konfirmasi Audit Otomatis jika sudah sampai */}
-                            {order.status === 'Shipped' && order.trackingHistory?.some(h => h.description?.toLowerCase().includes("sampai di tujuan")) && (
+                            {(order.status === 'Shipped' || order.status === 'Delivered') && (
                               <button
                                 onClick={async () => {
-                                  if (!window.confirm("Konfirmasi bahwa barang sudah sampai di tujuan untuk audit toko?")) return;
+                                  if (!window.confirm("Konfirmasi bahwa pesanan ini benar-benar selesai untuk keperluan audit toko?")) return;
                                   try {
                                     await axiosInstance.patch(`/api/v1/orders/${order.orderId}/status`, null, {
                                       params: { status: 'Completed' }
@@ -346,13 +531,60 @@ export default function AdminOrders() {
                                 }}
                                 style={{ padding: '8px 12px', background: '#2ecc71', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.75rem' }}
                               >
-                                Konfirmasi Selesai (Audit)
+                                Selesaikan Pesanan (Audit)
                               </button>
                             )}
-                          </div>
-                        ) : (
-                          <span style={{ color: '#555', fontSize: '0.85rem' }}>Pesanan {order.status}</span>
-                        )}
+                             {/* Tombol Bukti */}
+                             <div style={{ display: 'flex', gap: '5px' }}>
+                               {order.paymentProofs?.some(p => p.proofType === 'XENDIT_PAYMENT') && (
+                                 <button 
+                                   onClick={() => handleShowProof(order.paymentProofs, 'XENDIT_PAYMENT')}
+                                   style={{ padding: '6px 10px', background: 'rgba(46, 204, 113, 0.1)', color: '#2ecc71', border: '1px solid #2ecc71', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
+                                 >
+                                   Bukti Xendit
+                                 </button>
+                               )}
+                               {order.paymentProofs?.some(p => p.proofType === 'SHIPPING_RECEIPT') && (
+                                 <button 
+                                   onClick={() => handleShowProof(order.paymentProofs, 'SHIPPING_RECEIPT')}
+                                   style={{ padding: '6px 10px', background: 'rgba(52, 152, 219, 0.1)', color: '#3498db', border: '1px solid #3498db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
+                                 >
+                                   Bukti Pengiriman
+                                 </button>
+                               )}
+                             </div>
+                           </div>
+                         ) : (
+                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <span style={{ color: '#888', fontSize: '0.85rem' }}>Pesanan {order.status}</span>
+                              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                                {(order.paymentProofs || []).some(p => p.proofType === 'XENDIT_PAYMENT') && (
+                                  <button 
+                                    onClick={() => handleShowProof(order.paymentProofs, 'XENDIT_PAYMENT')}
+                                    style={{ padding: '6px 10px', background: 'rgba(46, 204, 113, 0.1)', color: '#2ecc71', border: '1px solid #2ecc71', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
+                                  >
+                                    Bukti Xendit
+                                  </button>
+                                )}
+                                {(order.paymentProofs || []).some(p => p.proofType === 'SHIPPING_RECEIPT') && (
+                                  <button 
+                                    onClick={() => handleShowProof(order.paymentProofs, 'SHIPPING_RECEIPT')}
+                                    style={{ padding: '6px 10px', background: 'rgba(52, 152, 219, 0.1)', color: '#3498db', border: '1px solid #3498db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
+                                  >
+                                    Bukti Pengiriman
+                                  </button>
+                                )}
+                                {(!order.paymentProofs || order.paymentProofs.length === 0) && (
+                                  <button 
+                                    onClick={() => handleShowProof(order.paymentProofs, 'all')}
+                                    style={{ padding: '6px 10px', background: 'rgba(255, 255, 255, 0.05)', color: '#ccc', border: '1px solid #444', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
+                                  >
+                                    Lihat Semua Bukti (Audit)
+                                  </button>
+                                )}
+                              </div>
+                           </div>
+                         )}
                       </td>
                     </motion.tr>
                   ))

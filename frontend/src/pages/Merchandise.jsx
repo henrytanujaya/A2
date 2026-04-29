@@ -17,11 +17,11 @@ export default function Merchandise() {
   };
 
   useEffect(() => {
+    let isMounted = true;
     const fetchMerch = async () => {
-// ... existing fetchMerch logic ...
       try {
         const response = await axiosInstance.get('/api/v1/products');
-        if (response.data.success) {
+        if (response.data.success && isMounted) {
           const allProducts = response.data.data;
           // Filter anything that is not Manga or Bluray, mostly ActionFigure or Outfit
           const merch = allProducts.filter(p => p.category === 'ActionFigure' || p.category === 'Outfit');
@@ -29,12 +29,19 @@ export default function Merchandise() {
         }
       } catch (err) {
         console.error('Failed to fetch merchandise', err);
-        setError('Gagal memuat data merchandise. Pastikan server backend aktif.');
+        if (isMounted) setError('Gagal memuat data merchandise. Pastikan server backend aktif.');
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
+    
     fetchMerch();
+    const intervalId = setInterval(fetchMerch, 3000);
+    
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
   }, []);
 
   return (

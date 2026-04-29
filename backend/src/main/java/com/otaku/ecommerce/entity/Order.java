@@ -62,6 +62,12 @@ public class Order {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
+    @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Invoice invoice;
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PaymentProof> paymentProofs = new ArrayList<>();
+
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
     public User getUser() { return user; }
@@ -94,4 +100,8 @@ public class Order {
     public void setPaymentUrl(String paymentUrl) { this.paymentUrl = paymentUrl; }
     public List<OrderItem> getItems() { return items; }
     public void setItems(List<OrderItem> items) { this.items = items; }
+    public Invoice getInvoice() { return invoice; }
+    public void setInvoice(Invoice invoice) { this.invoice = invoice; }
+    public List<PaymentProof> getPaymentProofs() { return paymentProofs; }
+    public void setPaymentProofs(List<PaymentProof> paymentProofs) { this.paymentProofs = paymentProofs; }
 }

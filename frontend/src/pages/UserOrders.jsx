@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Package, ArrowRight, CreditCard, Loader2, Truck, AlertTriangle } from 'lucide-react';
+import { Package, ArrowRight, CreditCard, Loader2, Truck, AlertTriangle, Trash2 } from 'lucide-react';
 import axiosInstance from '../api/axiosInstance';
 import { useModal } from '../contexts/ModalContext';
 
@@ -18,6 +18,10 @@ export default function UserOrders() {
   const { showModal } = useModal();
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const initialTab = params.get('tab');
+    if (initialTab) setActiveTab(initialTab);
+
     const fetchOrders = async (isPolling = false) => {
       if (!isPolling) setLoading(true);
       try {
@@ -29,13 +33,31 @@ export default function UserOrders() {
             // Deteksi Perubahan Status (Real-time Popup)
             allOrders.forEach(order => {
                const oldStatus = prev[order.orderId];
-               if (oldStatus && oldStatus !== order.status) {
-                  if (order.status === 'Shipped' || order.status === 'Processing') {
-                     showModal(`Hore! Pesanan INV-${order.orderId} telah dikonfirmasi Admin dan sedang disiapkan.`, 'success');
-                  } else if (order.status === 'STOCK_CONFLICT') {
-                     showModal(`Perhatian: Pesanan INV-${order.orderId} memiliki kendala stok. Harap hubungi Admin untuk penyesuaian.`, 'error');
-                  }
-               }
+                if (oldStatus && oldStatus !== order.status) {
+                   if (order.status === 'Processing') {
+                      // [C] Transaksi Diterima — Admin sudah validasi pembayaran
+                      showModal(`✅ Transaksi Diterima! Pesanan INV-${order.orderId} dikonfirmasi oleh Admin. Sedang dikemas untuk pengiriman.`, 'success');
+                      setActiveTab('shipping');
+                   } else if (order.status === 'Shipped') {
+                      // [D] Pindah ke Tab Pengiriman
+                      showModal(`🚚 Pesanan INV-${order.orderId} sedang dalam perjalanan! Lacak paket Anda di tab Pengiriman.`, 'success');
+                      setActiveTab('shipping');
+                   } else if (order.status === 'Waiting_Verification' || order.status === 'Paid') {
+                      // [B] Customer Bayar — Menunggu Konfirmasi Admin
+                      showModal(`💸 Pembayaran Pesanan INV-${order.orderId} BERHASIL! Mohon tunggu konfirmasi Admin.`, 'success');
+                      setActiveTab('waiting');
+                   } else if (order.status === 'Completed' || order.status === 'Delivered') {
+                      // [G] Selesai
+                      showModal(`🎉 Paket Pesanan INV-${order.orderId} sudah sampai di tujuan. Terima kasih telah berbelanja!`, 'success');
+                      setActiveTab('completed');
+                   } else if (order.status === 'Cancelled' || order.status === 'Rejected') {
+                      showModal(`Pesanan INV-${order.orderId} telah dibatalkan atau ditolak.`, 'error');
+                      setActiveTab('rejected');
+                   } else if (order.status === 'STOCK_CONFLICT') {
+                      showModal(`Perhatian: Pesanan INV-${order.orderId} memiliki kendala stok. Harap hubungi Admin.`, 'error');
+                      setActiveTab('waiting');
+                   }
+                }
             });
 
             // Update Map Status baru
@@ -44,12 +66,12 @@ export default function UserOrders() {
             return newStatusMap;
           });
 
-          // Filter Kategorisasi
+          // Filter Kategorisasi sesuai permintaan user (Kotak Warna)
           const unpaid = allOrders.filter(o => o.status === 'Pending').reverse();
-          const waiting = allOrders.filter(o => o.status === 'Waiting_Verification' || o.status === 'STOCK_CONFLICT').reverse();
+          const waiting = allOrders.filter(o => o.status === 'Waiting_Verification' || o.status === 'Paid' || o.status === 'STOCK_CONFLICT').reverse();
           const shipping = allOrders.filter(o => o.status === 'Processing' || o.status === 'Shipped').reverse();
-          const rejected = allOrders.filter(o => o.status === 'Cancelled').reverse();
-          const completed = allOrders.filter(o => o.status === 'Completed' || o.status === 'Paid').reverse();
+          const completed = allOrders.filter(o => o.status === 'Completed' || o.status === 'Delivered').reverse();
+          const rejected = allOrders.filter(o => ['Cancelled', 'Rejected', 'Expired'].includes(o.status)).reverse();
           
           setUnpaidOrders(unpaid);
           setWaitingOrders(waiting);
@@ -70,10 +92,35 @@ export default function UserOrders() {
   }, []); // Kosongkan dependency array agar tidak loop
 
   const handleViewInvoice = (orderId) => {
-    navigate(`/invoice/${orderId}`);
+     navigate(`/invoice/${orderId}`);
+   };
+ 
+  const handleCancelOrder = (orderId) => {
+    showModal(
+      "Apakah Anda yakin ingin membatalkan pesanan ini? Stok produk akan dikembalikan ke toko.",
+      "warning",
+      async () => {
+        try {
+          const res = await axiosInstance.put(`/api/v1/orders/${orderId}/cancel`);
+          if (res.data.success) {
+            showModal("Pesanan berhasil dibatalkan.", "success");
+            // Refresh orders
+            const updatedRes = await axiosInstance.get('/api/v1/orders');
+            if (updatedRes.data.success) {
+              const allOrders = updatedRes.data.data;
+              setUnpaidOrders(allOrders.filter(o => o.status === 'Pending').reverse());
+              setRejectedOrders(allOrders.filter(o => ['Cancelled', 'Rejected', 'Expired'].includes(o.status)).reverse());
+            }
+          }
+        } catch (error) {
+          console.error("Cancel order failed:", error);
+          showModal("Gagal membatalkan pesanan. Silakan hubungi Admin.", "error");
+        }
+      },
+      true // isConfirm mode
+    );
   };
-
-  const currentOrders = 
+   const currentOrders = 
     activeTab === 'unpaid' ? unpaidOrders : 
     activeTab === 'waiting' ? waitingOrders : 
     activeTab === 'shipping' ? shippingOrders : 
@@ -90,10 +137,10 @@ export default function UserOrders() {
       <div style={{ display: 'flex', gap: '10px', marginBottom: '30px', background: 'rgba(255,255,255,0.05)', padding: '5px', borderRadius: '12px', width: 'fit-content', flexWrap: 'wrap' }}>
         {[
           { id: 'unpaid', label: 'Belum Bayar', count: unpaidOrders.length },
-          { id: 'waiting', label: 'Menunggu Konfirmasi', count: waitingOrders.length },
-          { id: 'shipping', label: 'Dikirim', count: shippingOrders.length },
-          { id: 'completed', label: 'Selesai', count: completedOrders.length },
-          { id: 'rejected', label: 'Ditolak', count: rejectedOrders.length },
+          { id: 'waiting', label: 'Menunggu Konfirmasi 💸', count: waitingOrders.length },
+          { id: 'shipping', label: 'Pengiriman 🚚', count: shippingOrders.length },
+          { id: 'completed', label: 'Selesai ✨', count: completedOrders.length },
+          { id: 'rejected', label: 'Dibatalkan', count: rejectedOrders.length },
         ].map(tab => (
           <button 
             key={tab.id}
@@ -185,7 +232,29 @@ export default function UserOrders() {
                    </div>
                 )}
               </div>
- 
+
+              {activeTab === 'unpaid' && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+                  <button 
+                    onClick={() => handleCancelOrder(order.orderId)}
+                    title="Batalkan Pesanan"
+                    style={{ 
+                      background: 'rgba(231, 76, 60, 0.1)', 
+                      border: 'none', 
+                      padding: '8px', 
+                      borderRadius: '8px', 
+                      cursor: 'pointer',
+                      color: '#e74c3c',
+                      transition: 'all 0.3s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(231, 76, 60, 0.2)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(231, 76, 60, 0.1)'}
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              )}
+
               <button 
                 onClick={() => handleViewInvoice(order.orderId)}
                 className="nav-btn primary"
@@ -216,7 +285,6 @@ export default function UserOrders() {
                   <> <Package size={18} /> Detail & Lacak Paket </>
                 )}
               </button>
-
             </motion.div>
           ))}
         </div>

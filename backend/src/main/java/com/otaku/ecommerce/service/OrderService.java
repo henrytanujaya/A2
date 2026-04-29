@@ -27,13 +27,16 @@ public class OrderService {
 
     // Validasi transisi status order
     private static final Map<String, List<String>> VALID_TRANSITIONS = Map.of(
-        "Pending",              List.of("Waiting_Verification", "Processing", "Paid", "Shipped", "Cancelled"),
-        "Waiting_Verification", List.of("Processing", "Paid", "Shipped", "Cancelled"),
-        "Processing",           List.of("Shipped", "Cancelled"),
-        "Paid",                 List.of("Processing", "Shipped", "Cancelled"),
-        "Shipped",              List.of("Completed"),
+        "Pending",              List.of("Waiting_Verification", "Processing", "Paid", "Shipped", "Cancelled", "Expired"),
+        "Waiting_Verification", List.of("Processing", "Paid", "Shipped", "Cancelled", "Rejected"),
+        "Processing",           List.of("Shipped", "Cancelled", "Rejected"),
+        "Paid",                 List.of("Processing", "Shipped", "Cancelled", "Rejected"),
+        "Shipped",              List.of("Completed", "Delivered", "Cancelled"),
+        "Delivered",            List.of("Completed"),
         "Completed",            List.of(),
-        "Cancelled",            List.of()
+        "Cancelled",            List.of(),
+        "Rejected",             List.of(),
+        "Expired",              List.of()
     );
 
     @Autowired private OrderRepository        orderRepository;
@@ -44,9 +47,10 @@ public class OrderService {
     @Autowired private DiscountRepository     discountRepository;
     @Autowired private OrderTrackingRepository orderTrackingRepository;
     @Autowired private PaymentLogRepository    paymentLogRepository;
+    @Autowired private PaymentProofRepository    paymentProofRepository;
+    @Autowired private BiteshipService biteshipService;
 
     // ─── Create Order (dari email JWT, bukan userId dari body) ────────────────
-    @SuppressWarnings("null")
     @Transactional
     public OrderResponseDTO createOrder(OrderRequestDTO request, String userEmail) {
         // Ambil user dari email JWT — bukan dari request body (A01 IDOR fix)
@@ -163,8 +167,45 @@ public class OrderService {
 
         return buildResponse(order, appliedDiscount);
     }
+ 
+    // ─── Cancel Order (oleh Customer, dengan restorasi stok) ────────────────
+    @Transactional
+    public void cancelOrder(Integer orderId, String userEmail) {
+        if (orderId == null) throw new CustomBusinessException("OTK-4010", "ID tidak boleh kosong", 400);
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new CustomBusinessException("OTK-4042", "Order tidak ditemukan", 404));
 
-    // ─── Get Order by ID (dengan ownership check via @PreAuthorize di controller) ─
+        // Security: Hanya pemilik yang bisa membatalkan
+        if (!order.getUser().getEmail().equals(userEmail)) {
+            throw new CustomBusinessException("OTK-4030", "Anda tidak memiliki izin untuk membatalkan pesanan ini", 403);
+        }
+
+        // Validasi Status: Hanya pesanan "Pending" yang bisa dibatalkan
+        if (!"Pending".equals(order.getStatus())) {
+            throw new CustomBusinessException("OTK-4091", "Pesanan tidak dapat dibatalkan karena status sudah " + order.getStatus(), 400);
+        }
+
+        // Restorasi Stok Produk
+        for (OrderItem item : order.getItems()) {
+            if (item.getProduct() != null) {
+                productRepository.increaseStock(item.getProduct().getId(), item.getQuantity());
+                log.info("[STOCK-RESTORE] Stok produk '{}' dikembalikan sebanyak {} karena pembatalan pesanan INV-{}", 
+                    item.getProduct().getName(), item.getQuantity(), orderId);
+            } else if (item.getCustomOrder() != null) {
+                CustomOrder co = item.getCustomOrder();
+                co.setStatus("Quoted"); // Kembalikan status custom order ke penawaran
+                customOrderRepository.save(co);
+            }
+        }
+
+        order.setStatus("Cancelled");
+        order.setUpdatedAt(LocalDateTime.now());
+        orderRepository.save(order);
+
+        addTrackingHistory(orderId, "Cancelled", "Pesanan dibatalkan oleh pelanggan.");
+        log.info("[ORDER-CANCEL] Order {} telah dibatalkan oleh user {}", orderId, userEmail);
+    }
+     // ─── Get Order by ID (dengan ownership check via @PreAuthorize di controller) ─
     public OrderResponseDTO getOrderById(Integer orderId) {
         if (orderId == null) throw new CustomBusinessException("OTK-4010", "ID tidak boleh kosong", 400);
         Order order = orderRepository.findById(orderId)
@@ -211,16 +252,35 @@ public class OrderService {
                 throw new CustomBusinessException("OTK-4091",
                     "Status tidak bisa diubah dari '" + order.getStatus() + "' ke '" + status + "'", 400);
             }
+
+            // [Langkah 5] Validasi wajib resi saat status Shipped (Kecuali jika ini flow otomatis)
+            if ("Shipped".equals(status) && (trackingNumber == null || trackingNumber.isBlank())) {
+                throw new CustomBusinessException("OTK-4012", "Nomor resi (waybill) wajib diisi untuk status SHIPPED", 400);
+            }
+
             order.setStatus(status);
-            addTrackingHistory(orderId, status, "Status pesanan diperbarui menjadi: " + status);
-            
-            // AUTOMATION: Jika status berubah ke Processing/Shipped dan resi masih kosong, generate otomatis
-            if (("Processing".equals(status) || "Shipped".equals(status)) && (order.getTrackingNumber() == null || order.getTrackingNumber().isEmpty())) {
-                String courier = order.getCourierCode() != null ? order.getCourierCode().toUpperCase() : "JNE";
-                String autoResi = "MOCK-" + courier + "-" + order.getId() + "-" + (int)(Math.random() * 9000 + 1000);
-                order.setTrackingNumber(autoResi);
-                order.setStatus("Shipped"); // Paksa ke Shipped jika sudah ada resi
-                addTrackingHistory(orderId, "Shipped", "Nomor resi otomatis dibuat: " + autoResi);
+
+            // [Audit] Generate Invoice & Payment Proof Otomatis saat Processing/Shipped
+            if ("Processing".equals(status)) {
+                addTrackingHistory(orderId, status, "💰 Pembayaran divalidasi. Pesanan sedang disiapkan.");
+            } else if ("Shipped".equals(status)) {
+                addTrackingHistory(orderId, status, "🚚 Pesanan telah diserahkan ke kurir. Nomor Resi: " + (trackingNumber != null ? trackingNumber : order.getTrackingNumber()));
+            } else if ("Rejected".equals(status) || "Cancelled".equals(status)) {
+                // Restorasi Stok Produk
+                for (OrderItem item : order.getItems()) {
+                    if (item.getProduct() != null) {
+                        productRepository.increaseStock(item.getProduct().getId(), item.getQuantity());
+                        log.info("[STOCK-RESTORE] Stok produk '{}' dikembalikan sebanyak {} karena pesanan {} menjadi {}", 
+                            item.getProduct().getName(), item.getQuantity(), orderId, status);
+                    } else if (item.getCustomOrder() != null) {
+                        CustomOrder co = item.getCustomOrder();
+                        co.setStatus("Quoted"); // Kembalikan status custom order ke penawaran
+                        customOrderRepository.save(co);
+                    }
+                }
+                addTrackingHistory(orderId, status, "Status pesanan diperbarui menjadi: " + status + ". Stok dikembalikan.");
+            } else {
+                addTrackingHistory(orderId, status, "Status pesanan diperbarui menjadi: " + status);
             }
         }
 
@@ -234,7 +294,28 @@ public class OrderService {
     }
 
     @Transactional
-    @SuppressWarnings("null")
+    public OrderResponseDTO processAutomatedShipping(Integer orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new CustomBusinessException("OTK-4042", "Order tidak ditemukan", 404));
+
+        log.info("[LOGISTIK-OTOMATIS] Menghasilkan resi otomatis (Biteship) untuk Order #{}: {}", orderId);
+
+        String autoWaybill = biteshipService.createOrder(order);
+
+        if (autoWaybill == null || autoWaybill.isEmpty()) {
+             // Fallback jika API Biteship gagal (misal tidak ada internet)
+             String courier = (order.getCourierCode() != null && !order.getCourierCode().isEmpty()) ? order.getCourierCode().toUpperCase() : "JNE";
+             String randomSuffix = String.valueOf((int)(Math.random() * 90000000) + 10000000);
+             autoWaybill = "BSTST-" + courier + "-" + randomSuffix;
+        }
+
+        // Update Order Details secara otomatis ke Shipped
+        updateOrderDetails(orderId, "Shipped", null, autoWaybill);
+
+        return buildResponse(order, order.getDiscount());
+    }
+
+    @Transactional
     public boolean validateAndReduceStock(Integer orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new CustomBusinessException("OTK-4042", "Order tidak ditemukan", 404));
@@ -253,7 +334,6 @@ public class OrderService {
     }
     
     @Transactional
-    @SuppressWarnings("null")
     public void generateAutoTracking(Integer orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new CustomBusinessException("OTK-4042", "Order tidak ditemukan", 404));
@@ -274,7 +354,6 @@ public class OrderService {
 
     // ─── Order Tracking ───────────────────────────────────────────────────────
     @Transactional
-    @SuppressWarnings("null")
     public void addTrackingHistory(Integer orderId, String status, String description) {
         Order order = orderRepository.findById(orderId).orElse(null);
         if (order != null) {
@@ -308,8 +387,7 @@ public class OrderService {
     }
 
     // ─── Helper ───────────────────────────────────────────────────────────────
-    @SuppressWarnings("null")
-    private OrderResponseDTO buildResponse(Order order, Discount discount) {
+    public OrderResponseDTO buildResponse(Order order, Discount discount) {
         OrderResponseDTO dto = new OrderResponseDTO();
         dto.setOrderId(order.getId());
         dto.setTotalAmount(order.getTotalAmount());
@@ -330,18 +408,28 @@ public class OrderService {
             .ifPresent(log -> {
                 try {
                     // Coba ambil payment_method dari raw payload JSON jika ada
-                    Map<String, Object> payload = new com.fasterxml.jackson.databind.ObjectMapper()
-                            .readValue(log.getRawPayload(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-                    if (payload.containsKey("payment_method")) {
-                        dto.setPaymentMethod(String.valueOf(payload.get("payment_method")));
-                    } else if (payload.containsKey("payment_channel")) {
-                        dto.setPaymentMethod(String.valueOf(payload.get("payment_channel")));
+                    if (log.getRawPayload() != null && log.getRawPayload().contains("payment_method")) {
+                        dto.setPaymentMethod(log.getRawPayload().split("\"payment_method\":\"")[1].split("\"")[0]);
+                    } else {
+                        dto.setPaymentMethod("Xendit");
                     }
                 } catch (Exception e) {
-                    dto.setPaymentMethod(log.getStatus()); // Fallback
+                    dto.setPaymentMethod("Xendit");
                 }
             });
-        
+
+        // Set list bukti (Payment & Shipping)
+        List<com.otaku.ecommerce.dto.OrderResponseDTO.PaymentProofDTO> proofs = paymentProofRepository.findByOrderId(order.getId())
+            .stream().map(p -> {
+                com.otaku.ecommerce.dto.OrderResponseDTO.PaymentProofDTO pdto = new com.otaku.ecommerce.dto.OrderResponseDTO.PaymentProofDTO();
+                pdto.setProofType(p.getProofType());
+                pdto.setExternalReference(p.getExternalReference());
+                pdto.setDescription(p.getDescription());
+                pdto.setCreatedAt(p.getCreatedAt());
+                return pdto;
+            }).collect(Collectors.toList());
+        dto.setPaymentProofs(proofs);
+
         List<OrderItemResponseDTO> itemDTOs = order.getItems().stream().map(item -> {
             OrderItemResponseDTO idto = new OrderItemResponseDTO();
             idto.setItemId(item.getId());
@@ -359,8 +447,8 @@ public class OrderService {
                 idto.setProductName("Custom Order: " + item.getCustomOrder().getServiceType());
                 idto.setCustomOrderId(item.getCustomOrder().getId());
                 idto.setProductImage(item.getCustomOrder().getPreviewImageUrl() != null ? 
-                                   item.getCustomOrder().getPreviewImageUrl() : 
-                                   item.getCustomOrder().getImageReferenceUrl());
+                                    item.getCustomOrder().getPreviewImageUrl() : 
+                                    item.getCustomOrder().getImageReferenceUrl());
             }
             return idto;
         }).collect(Collectors.toList());
